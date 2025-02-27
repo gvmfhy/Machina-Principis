@@ -167,6 +167,11 @@ class SimulationUI {
     `;
     this.container.appendChild(modal);
     
+    // Create notification container
+    const notificationContainer = document.createElement('div');
+    notificationContainer.classList.add('notification-container');
+    this.container.appendChild(notificationContainer);
+    
     // Store references to key elements
     this.elements.map = mapCanvas;
     this.elements.sidebar = sidebar;
@@ -176,6 +181,7 @@ class SimulationUI {
     this.elements.controls = controlPanel;
     this.elements.turnInfo = document.getElementById('turn-display');
     this.elements.modal = modal;
+    this.elements.notificationContainer = notificationContainer;
   }
   
   _initializeMapCanvas() {
@@ -185,6 +191,31 @@ class SimulationUI {
     this.mapContext.textAlign = 'center';
     this.mapContext.textBaseline = 'middle';
     this.mapContext.font = '12px Arial';
+    
+    // Adjust canvas size to container
+    this._resizeCanvas();
+  }
+  
+  _resizeCanvas() {
+    const mapContainer = this.elements.map.parentElement;
+    const containerWidth = mapContainer.clientWidth;
+    const containerHeight = mapContainer.clientHeight;
+    
+    // If container dimensions are valid, resize the canvas
+    if (containerWidth > 0 && containerHeight > 0) {
+      this.elements.map.width = containerWidth;
+      this.elements.map.height = containerHeight;
+      
+      // Recalculate tile size based on map dimensions and canvas size
+      const gameState = this.gameCoordinator.getCurrentGameState();
+      if (gameState && gameState.map) {
+        const { width: mapWidth, height: mapHeight } = gameState.map;
+        this.config.tileSize = Math.min(
+          containerWidth / mapWidth,
+          containerHeight / mapHeight
+        );
+      }
+    }
   }
   
   _setupEventListeners() {
@@ -256,10 +287,14 @@ class SimulationUI {
     // Map click handler
     this.elements.map.addEventListener('click', (event) => {
       const rect = this.elements.map.getBoundingClientRect();
-      const x = Math.floor((event.clientX - rect.left) / this.config.tileSize);
-      const y = Math.floor((event.clientY - rect.top) / this.config.tileSize);
+      const canvasX = event.clientX - rect.left;
+      const canvasY = event.clientY - rect.top;
       
-      this._handleMapClick(x, y);
+      // Convert canvas coordinates to tile coordinates
+      const tileX = Math.floor(canvasX / this.config.tileSize);
+      const tileY = Math.floor(canvasY / this.config.tileSize);
+      
+      this._handleMapClick(tileX, tileY);
     });
     
     // Close modal button
@@ -305,6 +340,14 @@ class SimulationUI {
         'betrayal');
     });
     
+    // Export results shortcut (Ctrl+E)
+    document.addEventListener('keydown', (event) => {
+      if (event.ctrlKey && event.key === 'e') {
+        event.preventDefault();
+        this._exportResearchData();
+      }
+    });
+    
     // Window resize handler
     window.addEventListener('resize', () => {
       this._handleResize();
@@ -313,6 +356,8 @@ class SimulationUI {
   
   _getCivName(civId) {
     const gameState = this.gameCoordinator.getCurrentGameState();
+    if (!gameState || !gameState.civilizations) return 'Unknown Civilization';
+    
     const civ = gameState.civilizations.find(c => c.id === civId);
     return civ ? civ.name : 'Unknown Civilization';
   }
@@ -320,40 +365,50 @@ class SimulationUI {
   _handleMapClick(x, y) {
     // Get game state
     const gameState = this.gameCoordinator.getCurrentGameState();
+    if (!gameState) return;
     
     // Check if coordinates are valid
     if (x >= 0 && x < gameState.map.width && y >= 0 && y < gameState.map.height) {
       // Get map data
       const mapData = this.gameCoordinator.getMapState();
+      if (!mapData || !mapData.tiles || !mapData.tiles[y] || !mapData.tiles[y][x]) return;
       
       // Find if there's a settlement at this location
+      let foundCiv = null;
+      
       for (const civ of gameState.civilizations) {
         const civState = this.gameCoordinator.getCivilizationState(civ.id);
         
+        // Check for settlements
         for (const settlement of civState.settlements) {
           if (settlement.location.x === x && settlement.location.y === y) {
-            // Select this civilization
-            this.state.selectedCivId = civ.id;
-            this.state.selectedTile = { x, y };
-            this._updateSidebar();
-            return;
+            foundCiv = civ.id;
+            break;
           }
         }
         
         // Check for units
-        for (const unit of civState.units) {
-          if (unit.location.x === x && unit.location.y === y) {
-            // Select this civilization
-            this.state.selectedCivId = civ.id;
-            this.state.selectedTile = { x, y };
-            this._updateSidebar();
-            return;
+        if (!foundCiv) {
+          for (const unit of civState.units) {
+            if (unit.location.x === x && unit.location.y === y) {
+              foundCiv = civ.id;
+              break;
+            }
           }
         }
+        
+        if (foundCiv) break;
       }
       
-      // If no settlement or unit was found, just select the tile
+      // Update selected tile
       this.state.selectedTile = { x, y };
+      
+      // Update selected civilization if one was found
+      if (foundCiv) {
+        this.state.selectedCivId = foundCiv;
+      }
+      
+      // Update the sidebar
       this._updateSidebar();
     }
   }
@@ -402,60 +457,73 @@ class SimulationUI {
     // Get current game state
     const gameState = this.gameCoordinator.getCurrentGameState();
     
-    if (!gameState) return;
+    if (!gameState || !gameState.map) return;
     
     // Get map data based on selected civilization or observer mode
     const mapData = this.state.selectedCivId && this.state.observerMode !== 'omniscient' 
       ? this.gameCoordinator.getMapState(this.state.selectedCivId) 
       : this.gameCoordinator.getMapState();
     
+    if (!mapData || !mapData.tiles) return;
+    
     // Clear canvas
     this.mapContext.fillStyle = this.config.darkMode ? '#121212' : '#f0f0f0';
     this.mapContext.fillRect(0, 0, this.elements.map.width, this.elements.map.height);
     
+    // Calculate offset to center the map if canvas is larger than map
+    const tileSize = this.config.tileSize;
+    const mapWidthPx = mapData.width * tileSize;
+    const mapHeightPx = mapData.height * tileSize;
+    const offsetX = Math.max(0, (this.elements.map.width - mapWidthPx) / 2);
+    const offsetY = Math.max(0, (this.elements.map.height - mapHeightPx) / 2);
+    
     // Draw tiles
     for (let y = 0; y < mapData.height; y++) {
       for (let x = 0; x < mapData.width; x++) {
-        const tile = mapData.tiles[y][x];
+        const tile = mapData.tiles[y] && mapData.tiles[y][x];
+        if (!tile) continue;
+        
+        const px = offsetX + x * tileSize;
+        const py = offsetY + y * tileSize;
         
         // Skip if tile is not visible
         if (!tile.visible) {
-          this._drawFogOfWarTile(x, y);
+          this._drawFogOfWarTile(px, py, tileSize);
           continue;
         }
         
         // Draw the tile based on terrain type
-        this._drawTile(tile, x, y);
+        this._drawTile(tile, px, py, tileSize);
         
         // Draw any settlements on this tile
         if (tile.settlement) {
-          this._drawSettlement(tile, x, y);
+          this._drawSettlement(tile, px, py, tileSize);
         }
         
         // Draw units if present
-        if (tile.units > 0) {
-          this._drawUnits(tile, x, y);
+        if (tile.units && tile.units > 0) {
+          this._drawUnits(tile, px, py, tileSize);
         }
       }
     }
     
     // Draw selection highlight if a tile is selected
     if (this.state.selectedTile) {
-      this._drawSelectionHighlight(this.state.selectedTile.x, this.state.selectedTile.y);
+      const selX = offsetX + this.state.selectedTile.x * tileSize;
+      const selY = offsetY + this.state.selectedTile.y * tileSize;
+      this._drawSelectionHighlight(selX, selY, tileSize);
     }
     
     // Draw territory borders
-    this._drawTerritoryBorders(mapData);
+    this._drawTerritoryBorders(mapData, offsetX, offsetY, tileSize);
     
     // Update turn info
-    this.elements.turnInfo.textContent = `Turn: ${gameState.currentTurn} / ${gameState.maxTurns}`;
+    if (this.elements.turnInfo) {
+      this.elements.turnInfo.textContent = `Turn: ${gameState.currentTurn} / ${gameState.maxTurns}`;
+    }
   }
   
-  _drawTile(tile, x, y) {
-    const tileSize = this.config.tileSize;
-    const px = x * tileSize;
-    const py = y * tileSize;
-    
+  _drawTile(tile, px, py, tileSize) {
     // Different colors for different terrain types
     let color;
     switch (tile.terrainType) {
@@ -488,15 +556,11 @@ class SimulationUI {
     
     // Draw resource icon if present
     if (tile.resource) {
-      this._drawResourceIcon(tile.resource, px + tileSize / 2, py + tileSize / 4);
+      this._drawResourceIcon(tile.resource, px + tileSize / 2, py + tileSize / 4, tileSize / 10);
     }
   }
   
-  _drawFogOfWarTile(x, y) {
-    const tileSize = this.config.tileSize;
-    const px = x * tileSize;
-    const py = y * tileSize;
-    
+  _drawFogOfWarTile(px, py, tileSize) {
     // Draw fog of war
     this.mapContext.fillStyle = this.config.darkMode ? '#121212' : '#e0e0e0';
     this.mapContext.fillRect(px, py, tileSize, tileSize);
@@ -512,13 +576,11 @@ class SimulationUI {
     }
   }
   
-  _drawSettlement(tile, x, y) {
-    const tileSize = this.config.tileSize;
-    const px = x * tileSize;
-    const py = y * tileSize;
-    
+  _drawSettlement(tile, px, py, tileSize) {
     // Get settlement information from game state
     const gameState = this.gameCoordinator.getCurrentGameState();
+    if (!gameState) return;
+    
     let settlementInfo = null;
     let ownerColor = '#000000';
     
@@ -566,7 +628,7 @@ class SimulationUI {
       
       // Draw population indicator
       this.mapContext.fillStyle = this.config.darkMode ? 'white' : 'black';
-      this.mapContext.font = 'bold 12px Arial';
+      this.mapContext.font = `bold ${Math.max(10, tileSize / 4)}px Arial`;
       this.mapContext.fillText(
         settlementInfo.population.toString(),
         px + tileSize / 2,
@@ -575,11 +637,7 @@ class SimulationUI {
     }
   }
   
-  _drawUnits(tile, x, y) {
-    const tileSize = this.config.tileSize;
-    const px = x * tileSize;
-    const py = y * tileSize;
-    
+  _drawUnits(tile, px, py, tileSize) {
     // Draw unit icon
     this.mapContext.fillStyle = this.config.darkMode ? '#ffd54f' : '#ff9800';
     this.mapContext.beginPath();
@@ -592,7 +650,7 @@ class SimulationUI {
     // Draw unit count if more than one
     if (tile.units > 1) {
       this.mapContext.fillStyle = this.config.darkMode ? 'white' : 'black';
-      this.mapContext.font = 'bold 10px Arial';
+      this.mapContext.font = `bold ${Math.max(8, tileSize / 5)}px Arial`;
       this.mapContext.fillText(
         tile.units.toString(),
         px + tileSize / 2,
@@ -601,15 +659,15 @@ class SimulationUI {
     }
   }
   
-  _drawResourceIcon(resourceType, x, y) {
+  _drawResourceIcon(resourceType, x, y, size) {
     this.mapContext.fillStyle = this.config.darkMode ? '#ffd54f' : '#ffc107';
     this.mapContext.beginPath();
-    this.mapContext.arc(x, y, 5, 0, Math.PI * 2);
+    this.mapContext.arc(x, y, size, 0, Math.PI * 2);
     this.mapContext.fill();
     
     // Resource type icon (simplified)
     this.mapContext.fillStyle = this.config.darkMode ? 'black' : 'white';
-    this.mapContext.font = '8px Arial';
+    this.mapContext.font = `${Math.max(8, size)}px Arial`;
     
     let symbol;
     switch (resourceType) {
@@ -621,7 +679,7 @@ class SimulationUI {
       default: symbol = '•';
     }
     
-    this.mapContext.fillText(symbol, x, y + 3);
+    this.mapContext.fillText(symbol, x, y + size/2);
   }
   
   _drawStar(cx, cy, spikes, outerRadius, innerRadius) {
@@ -658,11 +716,7 @@ class SimulationUI {
     this.mapContext.fill();
   }
   
-  _drawSelectionHighlight(x, y) {
-    const tileSize = this.config.tileSize;
-    const px = x * tileSize;
-    const py = y * tileSize;
-    
+  _drawSelectionHighlight(px, py, tileSize) {
     // Draw highlighted border
     this.mapContext.strokeStyle = '#f44336'; // Red highlight
     this.mapContext.lineWidth = 3;
@@ -670,12 +724,14 @@ class SimulationUI {
     this.mapContext.lineWidth = 1;
   }
   
-  _drawTerritoryBorders(mapData) {
+  _drawTerritoryBorders(mapData, offsetX, offsetY, tileSize) {
     // This would be a complex implementation to show territory borders
     // For this prototype, we'll use a simplified approach
     
     // Get all settlement locations from game state
     const gameState = this.gameCoordinator.getCurrentGameState();
+    if (!gameState) return;
+    
     const settlements = [];
     
     for (const civ of gameState.civilizations) {
@@ -691,12 +747,11 @@ class SimulationUI {
     }
     
     // Draw influence circles around settlements
-    const tileSize = this.config.tileSize;
     const influenceRadius = 3 * tileSize;
     
     settlements.forEach(settlement => {
-      const cx = settlement.location.x * tileSize + tileSize / 2;
-      const cy = settlement.location.y * tileSize + tileSize / 2;
+      const cx = offsetX + settlement.location.x * tileSize + tileSize / 2;
+      const cy = offsetY + settlement.location.y * tileSize + tileSize / 2;
       
       // Draw territory influence circle
       this.mapContext.globalAlpha = 0.2;
@@ -746,6 +801,8 @@ class SimulationUI {
   }
   
   _updateCivPanel(civState) {
+    if (!civState) return;
+    
     // Create civilization info HTML
     let html = `
       <h3 style="color: ${civState.color}">${civState.name}</h3>
@@ -810,6 +867,8 @@ class SimulationUI {
   }
   
   _updateThoughtPanel(thoughts) {
+    if (!thoughts) return;
+    
     if (thoughts.error) {
       this.elements.thoughtPanel.innerHTML = `<p class="error">${thoughts.error}</p>`;
       return;
@@ -885,6 +944,8 @@ class SimulationUI {
   }
   
   _updateMetricsPanel(metrics) {
+    if (!metrics) return;
+    
     if (metrics.error) {
       this.elements.metricsPanel.innerHTML = `<p class="error">${metrics.error}</p>`;
       return;
@@ -951,8 +1012,9 @@ class SimulationUI {
     `;
     
     // Add to container
-    const notificationContainer = document.querySelector('.notification-container') || this._createNotificationContainer();
-    notificationContainer.appendChild(notification);
+    if (this.elements.notificationContainer) {
+      this.elements.notificationContainer.appendChild(notification);
+    }
     
     // Animate in
     setTimeout(() => {
@@ -968,15 +1030,9 @@ class SimulationUI {
     }, 5000);
   }
   
-  _createNotificationContainer() {
-    const container = document.createElement('div');
-    container.classList.add('notification-container');
-    this.container.appendChild(container);
-    return container;
-  }
-  
   _showGameEndModal(reason) {
     const gameState = this.gameCoordinator.getCurrentGameState();
+    if (!gameState) return;
     
     let title = 'Game Over';
     let message = '';
@@ -997,6 +1053,8 @@ class SimulationUI {
     }
     
     const modalBody = document.getElementById('modal-body');
+    if (!modalBody) return;
+    
     modalBody.innerHTML = `
       <h2>${title}</h2>
       <p>${message}</p>
@@ -1043,6 +1101,7 @@ class SimulationUI {
   _exportResearchData() {
     // Get research data
     const researchData = this.gameCoordinator.exportResearchData();
+    if (!researchData) return;
     
     // Convert to JSON
     const jsonData = JSON.stringify(researchData, null, 2);
@@ -1062,15 +1121,73 @@ class SimulationUI {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     }, 0);
+    
+    // Show confirmation
+    this._showEventNotification('Export Complete', 'Research data has been exported successfully', 'info');
   }
   
   _handleResize() {
     // Adjust canvas size and redraw
-    this.update();
+    this._resizeCanvas();
+    this._renderMap();
   }
   
   update() {
     // Update the UI with current game state
     this._updateSidebar();
+    this._renderMap();
+  }
+  
+  // Public methods for external control
+  selectCivilization(civId) {
+    this.state.selectedCivId = civId;
+    this._updateSidebar();
+  }
+  
+  setObserverMode(mode) {
+    if (['diplomat', 'historian', 'omniscient'].includes(mode)) {
+      this.state.observerMode = mode;
+      const select = document.getElementById('observer-mode-select');
+      if (select) select.value = mode;
+      
+      this.gameCoordinator.observerInterface.setObservationMode(mode);
+      this._updateSidebar();
+    }
+  }
+  
+  setSpeed(speed) {
+    const validSpeeds = [0.5, 1, 2, 5];
+    if (validSpeeds.includes(speed)) {
+      this.state.speed = speed;
+      const select = document.getElementById('speed-select');
+      if (select) select.value = speed;
+      
+      this.gameCoordinator.config.turnDelay = 1000 / speed;
+    }
+  }
+  
+  togglePause() {
+    const btn = document.getElementById('play-pause-btn');
+    if (btn) btn.click();
+  }
+  
+  // Cleanup resources when done
+  destroy() {
+    // Stop animation loop
+    if (this.requestAnimationId) {
+      cancelAnimationFrame(this.requestAnimationId);
+      this.requestAnimationId = null;
+    }
+    
+    // Clear container
+    if (this.container) {
+      this.container.innerHTML = '';
+    }
+    
+    // Clean up event listeners
+    window.removeEventListener('resize', this._handleResize);
   }
 }
+
+// Export the class
+module.exports = SimulationUI;
