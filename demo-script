@@ -1,0 +1,156 @@
+// Machiavellian AI Civilization Framework - Demo Script
+// This script demonstrates how to use the framework to run a simple simulation
+
+const GameCoordinator = require('./game-coordinator');
+
+// Demo configuration
+const config = {
+  mapSize: { width: 16, height: 16 },
+  numCivilizations: 4,
+  maxTurns: 50,
+  turnDelay: 500, // ms between turns
+  debug: true,
+  autoPlay: true,
+  llmConfig: {
+    model: "stub", // Use stub model
+    maxTokens: 1000,
+    temperature: 0.7
+  },
+  resourceDistribution: "balanced",
+  startingTech: ["pottery"],
+  revealMap: false,
+  observationMode: "omniscient"
+};
+
+// Create and run the simulation
+async function runDemo() {
+  console.log("Starting Machiavellian AI Civilization Framework Demo");
+  console.log("---------------------------------------------------");
+  
+  // Create the game coordinator
+  const game = new GameCoordinator(config);
+  
+  // Register event listeners
+  game.onTurn((turn, state) => {
+    console.log(`\nCompleted Turn ${turn}`);
+  });
+  
+  game.onGameStateChange((state, data) => {
+    console.log(`Game state changed to: ${state}`);
+  });
+  
+  // Interesting events to track
+  game.addEventListener('communication-sent', (event) => {
+    console.log(`\n${event.fromCivId} sent a message to ${event.toCivId}: ${event.proposalType}`);
+  });
+  
+  game.addEventListener('alliance-formed', (event) => {
+    console.log(`\nALLIANCE: ${event.civ1Id} and ${event.civ2Id} formed an alliance`);
+  });
+  
+  game.addEventListener('declaration-of-war', (event) => {
+    console.log(`\nWAR DECLARED: ${event.fromCivId} declared war on ${event.toCivId}`);
+  });
+  
+  // Initialize the game
+  const initialized = await game.initialize();
+  if (!initialized) {
+    console.error("Failed to initialize game");
+    return;
+  }
+  
+  // Start the game
+  await game.start();
+  
+  // The game will run automatically due to autoPlay: true
+  // Let's wait for it to complete
+  await waitForGameEnd(game);
+  
+  // Print final analysis
+  printFinalAnalysis(game);
+}
+
+// Utility function to wait for game to end
+function waitForGameEnd(game) {
+  return new Promise(resolve => {
+    const checkInterval = setInterval(() => {
+      if (!game.isRunning) {
+        clearInterval(checkInterval);
+        resolve();
+      }
+    }, 1000);
+  });
+}
+
+// Print final analysis of the simulation
+function printFinalAnalysis(game) {
+  console.log("\n\n=== FINAL ANALYSIS ===\n");
+  
+  // Get civilization states
+  const civilizations = game.gameEngine.civilizations;
+  
+  console.log("Civilization Status:");
+  civilizations.forEach(civ => {
+    console.log(`\n${civ.name}:`);
+    console.log(`- Settlements: ${civ.settlements.length}`);
+    console.log(`- Technologies: ${civ.technologies.length}`);
+    console.log(`- Military Units: ${civ.units.length}`);
+    console.log(`- Resources: ${JSON.stringify(civ.resources)}`);
+    
+    // Get Machiavellian score
+    const score = game.observerInterface.getMachiavellianScore(civ.id);
+    console.log(`- Machiavellian Score: ${score.overallScore}/10 (${score.interpretation})`);
+    
+    // Check deception instances
+    const deception = game.observerInterface.getDeceptionAnalysis(civ.id);
+    console.log(`- Deception Instances: ${deception.totalDeceptions}`);
+    
+    // Check betrayals
+    const betrayal = game.observerInterface.getBetrayalAnalysis(civ.id);
+    console.log(`- Betrayals: ${betrayal.totalBetrayals}`);
+  });
+  
+  console.log("\nRelationship Map:");
+  for (let i = 0; i < civilizations.length; i++) {
+    for (let j = i + 1; j < civilizations.length; j++) {
+      const civ1 = civilizations[i];
+      const civ2 = civilizations[j];
+      const status = game.gameEngine._getDiplomaticStatusBetween(civ1.id, civ2.id);
+      console.log(`- ${civ1.name} and ${civ2.name}: ${status}`);
+    }
+  }
+  
+  console.log("\nKey Events:");
+  const events = game.gameEngine.eventLog
+    .filter(e => ['declaration-of-war', 'alliance-formed', 'alliance-broken', 'peace-treaty'].includes(e.type))
+    .slice(-10);
+  
+  events.forEach(event => {
+    console.log(`- Turn ${event.turn}: ${event.description}`);
+  });
+  
+  console.log("\nMachiavellian Behavior Summary:");
+  civilizations.forEach(civ => {
+    const patterns = game.observerInterface.getStrategicPatternAnalysis(civ.id);
+    const score = game.observerInterface.getMachiavellianScore(civ.id);
+    
+    console.log(`\n${civ.name}:`);
+    console.log(`- Primary Strategy: ${patterns.primaryStrategy}`);
+    console.log(`- Machiavellian Score: ${score.overallScore}/10`);
+    console.log(`- Development Trend: ${score.developmentTrend}`);
+    
+    // Print a notable private thought that contrasts with public actions
+    const deceptions = game.observerInterface.behaviorRecords[civ.id].deceptionInstances;
+    if (deceptions.length > 0) {
+      const example = deceptions[deceptions.length - 1];
+      console.log("\nExample of Deceptive Behavior:");
+      console.log(`Private Thought: "${example.privateThoughts.substring(0, 100)}..."`);
+      console.log(`Public Message: "${example.publicMessage}"`);
+    }
+  });
+}
+
+// Run the demo
+runDemo().catch(err => {
+  console.error("Error running demo:", err);
+});
