@@ -1,0 +1,656 @@
+// Machiavellian AI Civilization Framework - Game Coordinator
+// This is the central component that ties together all the others and manages the game flow
+
+const { GameEngine } = require('./game-engine-core');
+const { GameMap, Civilization, Settlement, Building, Unit } = require('./game-models');
+const { AIAgentManager, MemoryStore } = require('./ai-agent-manager');
+const { ObserverInterface } = require('./observer-interface');
+const LLMClient = require('./llm-client-stub'); // We'll use a stub initially
+
+class GameCoordinator {
+  constructor(config) {
+    this.config = this._mergeDefaults(config);
+    this.isRunning = false;
+    this.isPaused = false;
+    this.currentTurn = 0;
+    this.gameEngine = null;
+    this.aiAgentManager = null;
+    this.observerInterface = null;
+    this.turnCallbacks = [];
+    this.gameStateCallbacks = [];
+    this.eventListeners = {};
+    
+    // Set up the logger
+    this.logger = {
+      info: (msg) => console.log(`[INFO] ${msg}`),
+      warn: (msg) => console.warn(`[WARN] ${msg}`),
+      error: (msg) => console.error(`[ERROR] ${msg}`),
+      debug: (msg) => this.config.debug ? console.log(`[DEBUG] ${msg}`) : null
+    };
+  }
+  
+  _mergeDefaults(config) {
+    // Set default configuration
+    return {
+      mapSize: config.mapSize || { width: 20, height: 20 },
+      numCivilizations: config.numCivilizations || 4,
+      maxTurns: config.maxTurns || 200,
+      turnDelay: config.turnDelay || 1000, // ms between turns
+      debug: config.debug !== undefined ? config.debug : false,
+      autoPlay: config.autoPlay !== undefined ? config.autoPlay : false,
+      llmConfig: config.llmConfig || {
+        model: "stub", // Use stub model initially
+        maxTokens: 1000,
+        temperature: 0.7
+      },
+      randomSeed: config.randomSeed || Date.now(),
+      resourceDistribution: config.resourceDistribution || "balanced",
+      startingTech: config.startingTech || ["pottery"],
+      revealMap: config.revealMap !== undefined ? config.revealMap : false,
+      observationMode: config.observationMode || "omniscient"
+    };
+  }
+  
+  async initialize() {
+    this.logger.info("Initializing game...");
+    
+    try {
+      // 1. Set up LLM client
+      const llmClient = new LLMClient(this.config.llmConfig);
+      await llmClient.initialize();
+      
+      // 2. Create the game engine
+      this.logger.info("Creating game engine...");
+      this.gameEngine = new GameEngine({
+        mapSize: this.config.mapSize,
+        maxTurns: this.config.maxTurns,
+        numCivilizations: this.config.numCivilizations,
+        randomSeed: this.config.randomSeed,
+        resourceDistribution: this.config.resourceDistribution
+      });
+      
+      // 3. Create the AI agent manager
+      this.logger.info("Creating AI agent manager...");
+      this.aiAgentManager = new AIAgentManager({
+        llmClient: llmClient,
+        maxContextSize: 4000
+      });
+      
+      // 4. Create the observer interface
+      this.logger.info("Creating observer interface...");
+      this.observerInterface = new ObserverInterface(this.gameEngine, this.aiAgentManager);
+      this.observerInterface.setObservationMode(this.config.observationMode);
+      
+      // 5. Initialize the AI agents
+      this.logger.info("Initializing AI agents...");
+      await this.aiAgentManager.initializeAgents(this.gameEngine.civilizations);
+      
+      // 6. Initialize the observer interface
+      this.logger.info("Initializing observer interface...");
+      this.observerInterface.initialize();
+      
+      // 7. Add starting technologies
+      if (this.config.startingTech && this.config.startingTech.length > 0) {
+        this.gameEngine.civilizations.forEach(civ => {
+          this.config.startingTech.forEach(tech => {
+            civ.technologies.push(tech);
+          });
+        });
+      }
+      
+      // 8. Reveal map if configured
+      if (this.config.revealMap) {
+        this._revealEntireMap();
+      }
+      
+      // 9. Set up event forwarding
+      this._setupEventForwarding();
+      
+      // 10. Set initial game state
+      this.currentTurn = 0;
+      this.isRunning = false;
+      this.isPaused = false;
+      
+      this.logger.info("Game initialization complete!");
+      return true;
+    } catch (error) {
+      this.logger.error(`Error during initialization: ${error.message}`);
+      this.logger.error(error.stack);
+      return false;
+    }
+  }
+  
+  _revealEntireMap() {
+    // Reveal the entire map to all civilizations (for testing/debugging)
+    this.gameEngine.civilizations.forEach(civ => {
+      for (let y = 0; y < this.gameEngine.map.height; y++) {
+        for (let x = 0; x < this.gameEngine.map.width; x++) {
+          this.gameEngine.map.revealAroundLocation({ x, y }, 0, civ.id);
+        }
+      }
+    });
+  }
+  
+  _setupEventForwarding() {
+    // Forward events from game engine to interested parties
+    // In a full implementation, this would use proper event emitters
+    
+    // This is a simple stub for the real event handling system
+    this.gameEngine.eventCallback = (eventType, eventData) => {
+      // Forward to observer interface
+      if (eventType === 'communication-sent') {
+        this.observerInterface._onCommunicationSent(eventData);
+      } else if (eventType === 'action-taken') {
+        this.observerInterface._onActionTaken(eventData);
+      } else if (eventType === 'alliance-formed') {
+        this.observerInterface._onAllianceFormed(eventData);
+      } else if (eventType === 'alliance-broken') {
+        this.observerInterface._onAllianceBroken(eventData);
+      }
+      
+      // Forward to any registered event listeners
+      if (this.eventListeners[eventType]) {
+        this.eventListeners[eventType].forEach(callback => {
+          try {
+            callback(eventData);
+          } catch (error) {
+            this.logger.error(`Error in event listener for ${eventType}: ${error.message}`);
+          }
+        });
+      }
+    };
+  }
+  
+  async start() {
+    if (this.isRunning) {
+      this.logger.warn("Game is already running");
+      return false;
+    }
+    
+    this.logger.info("Starting game...");
+    this.isRunning = true;
+    this.isPaused = false;
+    
+    if (this.config.autoPlay) {
+      this._runGameLoop();
+    } else {
+      this._notifyGameStateChange("started");
+    }
+    
+    return true;
+  }
+  
+  async _runGameLoop() {
+    this.logger.info("Starting game loop...");
+    
+    try {
+      while (this.isRunning && !this.isPaused && this.currentTurn < this.config.maxTurns) {
+        await this.processTurn();
+        
+        // Add delay between turns for visualization
+        if (this.config.turnDelay > 0) {
+          await new Promise(resolve => setTimeout(resolve, this.config.turnDelay));
+        }
+      }
+      
+      if (this.currentTurn >= this.config.maxTurns) {
+        this.logger.info("Game complete! Maximum turns reached.");
+        this._endGame("max_turns");
+      }
+      
+    } catch (error) {
+      this.logger.error(`Error in game loop: ${error.message}`);
+      this.logger.error(error.stack);
+      this._endGame("error");
+    }
+  }
+  
+  async processTurn() {
+    const turnNumber = this.currentTurn + 1;
+    this.logger.info(`Processing turn ${turnNumber}...`);
+    
+    try {
+      // 1. Get current game state for each civilization
+      const gameState = this.gameEngine._generateStateUpdates();
+      
+      // 2. Get AI decisions for all civilizations
+      this.logger.debug("Getting AI decisions...");
+      const decisions = await this.aiAgentManager.processTurn(gameState, turnNumber);
+      
+      // 3. Process actions in the game engine
+      this.logger.debug("Processing actions in game engine...");
+      const allActions = [];
+      const allCommunications = [];
+      
+      // Collect all actions and communications
+      for (const civId in decisions) {
+        allActions.push(...decisions[civId].actions);
+        allCommunications.push(...decisions[civId].communications);
+      }
+      
+      // Process actions in the game engine
+      this.gameEngine.processTurn(allActions);
+      
+      // 4. Process communications
+      this.logger.debug("Processing communications...");
+      this._processCommunications(allCommunications);
+      
+      // 5. Run periodic reflection for AIs
+      this.logger.debug("Running AI reflections...");
+      for (const civ of this.gameEngine.civilizations) {
+        await this.aiAgentManager.runPeriodicReflection(civ.id, turnNumber);
+      }
+      
+      // 6. Update turn counter
+      this.currentTurn = turnNumber;
+      
+      // 7. Notify turn callbacks
+      this._notifyTurnComplete(turnNumber, gameState);
+      
+      this.logger.info(`Turn ${turnNumber} complete!`);
+      return true;
+    } catch (error) {
+      this.logger.error(`Error processing turn ${turnNumber}: ${error.message}`);
+      this.logger.error(error.stack);
+      return false;
+    }
+  }
+  
+  _processCommunications(communications) {
+    // Process all communications (messages between civilizations)
+    communications.forEach(comm => {
+      const { fromCivId, toCivId, proposalType, terms, originalMessage } = comm.data;
+      
+      // Log the communication
+      this.logger.debug(`Communication from ${fromCivId} to ${toCivId}: ${proposalType}`);
+      
+      // Add to game engine's communication logs
+      this.gameEngine.communicationLogs.push({
+        turn: this.currentTurn,
+        from: fromCivId,
+        to: toCivId,
+        type: proposalType,
+        terms: terms,
+        message: originalMessage,
+        status: 'sent'
+      });
+      
+      // Emit communication event
+      this.gameEngine.eventCallback('communication-sent', {
+        turn: this.currentTurn,
+        fromCivId,
+        toCivId,
+        proposalType,
+        terms,
+        message: originalMessage
+      });
+      
+      // Handle special communication types
+      if (proposalType === 'war-declaration') {
+        // Handle declaration of war
+        this.gameEngine.eventLog.push({
+          turn: this.currentTurn,
+          type: 'declaration-of-war',
+          fromCivId,
+          toCivId,
+          description: `${this.gameEngine._getCivName(fromCivId)} declared war on ${this.gameEngine._getCivName(toCivId)}`
+        });
+      } else if (proposalType === 'peace-treaty') {
+        // Handle peace treaty
+        this.gameEngine.eventLog.push({
+          turn: this.currentTurn,
+          type: 'peace-treaty',
+          civ1Id: fromCivId,
+          civ2Id: toCivId,
+          description: `${this.gameEngine._getCivName(fromCivId)} and ${this.gameEngine._getCivName(toCivId)} signed a peace treaty`
+        });
+      } else if (proposalType === 'alliance-proposal' && terms) {
+        // Handle alliance proposal
+        this.gameEngine.eventLog.push({
+          turn: this.currentTurn,
+          type: 'alliance-formed',
+          civ1Id: fromCivId,
+          civ2Id: toCivId,
+          allianceType: terms.type || 'general',
+          terms: terms,
+          description: `${this.gameEngine._getCivName(fromCivId)} and ${this.gameEngine._getCivName(toCivId)} formed an alliance`
+        });
+      }
+    });
+  }
+  
+  pause() {
+    if (!this.isRunning) {
+      this.logger.warn("Game is not running");
+      return false;
+    }
+    
+    this.logger.info("Pausing game...");
+    this.isPaused = true;
+    this._notifyGameStateChange("paused");
+    return true;
+  }
+  
+  resume() {
+    if (!this.isRunning) {
+      this.logger.warn("Game is not running");
+      return false;
+    }
+    
+    if (!this.isPaused) {
+      this.logger.warn("Game is not paused");
+      return false;
+    }
+    
+    this.logger.info("Resuming game...");
+    this.isPaused = false;
+    
+    if (this.config.autoPlay) {
+      this._runGameLoop();
+    }
+    
+    this._notifyGameStateChange("resumed");
+    return true;
+  }
+  
+  stop() {
+    if (!this.isRunning) {
+      this.logger.warn("Game is not running");
+      return false;
+    }
+    
+    this.logger.info("Stopping game...");
+    this._endGame("stopped");
+    return true;
+  }
+  
+  _endGame(reason) {
+    this.isRunning = false;
+    this.isPaused = false;
+    this._notifyGameStateChange("ended", { reason });
+  }
+  
+  _notifyTurnComplete(turnNumber, gameState) {
+    // Notify all turn callbacks
+    this.turnCallbacks.forEach(callback => {
+      try {
+        callback(turnNumber, gameState);
+      } catch (error) {
+        this.logger.error(`Error in turn callback: ${error.message}`);
+      }
+    });
+  }
+  
+  _notifyGameStateChange(state, data = {}) {
+    // Notify all game state callbacks
+    this.gameStateCallbacks.forEach(callback => {
+      try {
+        callback(state, { ...data, currentTurn: this.currentTurn });
+      } catch (error) {
+        this.logger.error(`Error in game state callback: ${error.message}`);
+      }
+    });
+  }
+  
+  // Public API methods
+  
+  onTurn(callback) {
+    if (typeof callback === 'function') {
+      this.turnCallbacks.push(callback);
+      return true;
+    }
+    return false;
+  }
+  
+  onGameStateChange(callback) {
+    if (typeof callback === 'function') {
+      this.gameStateCallbacks.push(callback);
+      return true;
+    }
+    return false;
+  }
+  
+  addEventListener(eventType, callback) {
+    if (typeof callback === 'function') {
+      if (!this.eventListeners[eventType]) {
+        this.eventListeners[eventType] = [];
+      }
+      this.eventListeners[eventType].push(callback);
+      return true;
+    }
+    return false;
+  }
+  
+  removeEventListener(eventType, callback) {
+    if (this.eventListeners[eventType]) {
+      this.eventListeners[eventType] = this.eventListeners[eventType].filter(cb => cb !== callback);
+      return true;
+    }
+    return false;
+  }
+  
+  getCurrentGameState() {
+    // Return a sanitized version of the current game state
+    return {
+      currentTurn: this.currentTurn,
+      maxTurns: this.config.maxTurns,
+      isRunning: this.isRunning,
+      isPaused: this.isPaused,
+      civilizations: this.gameEngine.civilizations.map(civ => ({
+        id: civ.id,
+        name: civ.name,
+        color: civ.color,
+        statistics: {
+          settlements: civ.settlements.length,
+          technologies: civ.technologies.length,
+          units: civ.units.length,
+          totalResources: Object.values(civ.resources).reduce((sum, val) => sum + val, 0)
+        }
+      })),
+      map: {
+        width: this.gameEngine.map.width,
+        height: this.gameEngine.map.height
+      },
+      events: this.gameEngine.eventLog.slice(-10) // Last 10 events
+    };
+  }
+  
+  getCivilizationState(civId, observerMode = null) {
+    // Get detailed state for a specific civilization
+    const civ = this.gameEngine.civilizations.find(c => c.id === civId);
+    if (!civ) {
+      return { error: "Civilization not found" };
+    }
+    
+    // Use provided mode or default to the global setting
+    const mode = observerMode || this.observerInterface.observationMode;
+    
+    const result = {
+      id: civ.id,
+      name: civ.name,
+      color: civ.color,
+      resources: { ...civ.resources },
+      technologies: [...civ.technologies],
+      currentResearch: civ.currentResearch,
+      researchProgress: civ.researchProgress,
+      settlements: civ.settlements.map(s => ({
+        id: s.id,
+        name: s.name,
+        location: { ...s.location },
+        population: s.population,
+        buildings: s.buildings.map(b => b.type)
+      })),
+      units: civ.units.map(u => ({
+        id: u.id,
+        type: u.type,
+        location: { ...u.location },
+        strength: u.strength,
+        movesRemaining: u.movesRemaining
+      })),
+      diplomaticStatus: this._getDiplomaticStatusForCiv(civ)
+    };
+    
+    // Add private thoughts if in omniscient mode
+    if (mode === 'omniscient') {
+      const agentData = this.aiAgentManager.agents[civId];
+      if (agentData) {
+        result.privateThoughts = {
+          current: agentData.currentThoughts,
+          personality: agentData.personality,
+          recentDecisions: agentData.previousDecisions.slice(-3)
+        };
+      }
+    }
+    
+    return result;
+  }
+  
+  _getDiplomaticStatusForCiv(civ) {
+    // Get diplomatic status with all other civilizations
+    const status = {};
+    
+    this.gameEngine.civilizations.forEach(otherCiv => {
+      if (otherCiv.id !== civ.id) {
+        status[otherCiv.id] = this.gameEngine._getDiplomaticStatusBetween(civ.id, otherCiv.id);
+      }
+    });
+    
+    return status;
+  }
+  
+  getMapState(civId = null) {
+    // Get the current map state
+    // If civId is provided, only return tiles visible to that civilization
+    const mapData = {
+      width: this.gameEngine.map.width,
+      height: this.gameEngine.map.height,
+      tiles: []
+    };
+    
+    for (let y = 0; y < this.gameEngine.map.height; y++) {
+      mapData.tiles[y] = [];
+      for (let x = 0; x < this.gameEngine.map.width; x++) {
+        // Check visibility if civId provided
+        if (civId && !this.gameEngine.map.isTileVisibleToCiv({ x, y }, civId)) {
+          mapData.tiles[y][x] = {
+            x,
+            y,
+            visible: false
+          };
+        } else {
+          // Include full tile data
+          const tile = this.gameEngine.map.tiles[y][x];
+          mapData.tiles[y][x] = {
+            x,
+            y,
+            visible: true,
+            terrainType: tile.terrainType,
+            resource: tile.resource,
+            settlement: tile.settlement,
+            units: tile.units.length
+          };
+        }
+      }
+    }
+    
+    return mapData;
+  }
+  
+  getAnalysisData(civId) {
+    // Get analysis data from the observer interface
+    return {
+      deception: this.observerInterface.getDeceptionAnalysis(civId),
+      cooperation: this.observerInterface.getCooperationAnalysis(civId),
+      betrayal: this.observerInterface.getBetrayalAnalysis(civId),
+      powerSeeking: this.observerInterface.getPowerSeekingAnalysis(civId),
+      valueShifts: this.observerInterface.getValueShiftAnalysis(civId),
+      strategicPatterns: this.observerInterface.getStrategicPatternAnalysis(civId),
+      machiavellianScore: this.observerInterface.getMachiavellianScore(civId)
+    };
+  }
+  
+  exportResearchData() {
+    // Export research data from the observer interface
+    return this.observerInterface.exportResearchData();
+  }
+  
+  // Manual intervention methods (for researchers)
+  
+  injectEvent(eventType, eventData) {
+    // Inject a custom event into the simulation
+    if (!this.isRunning) {
+      this.logger.warn("Cannot inject event: Game is not running");
+      return false;
+    }
+    
+    this.logger.info(`Injecting custom event: ${eventType}`);
+    
+    // Add to event log
+    this.gameEngine.eventLog.push({
+      turn: this.currentTurn,
+      type: eventType,
+      ...eventData,
+      isInjected: true
+    });
+    
+    // Emit the event
+    this.gameEngine.eventCallback(eventType, {
+      ...eventData,
+      turn: this.currentTurn,
+      isInjected: true
+    });
+    
+    return true;
+  }
+  
+  modifyResources(civId, resources) {
+    // Modify a civilization's resources (for testing)
+    const civ = this.gameEngine.civilizations.find(c => c.id === civId);
+    if (!civ) {
+      return false;
+    }
+    
+    this.logger.info(`Modifying resources for ${civId}`);
+    
+    for (const resource in resources) {
+      if (civ.resources[resource] !== undefined) {
+        civ.resources[resource] += resources[resource];
+        // Ensure non-negative values
+        civ.resources[resource] = Math.max(0, civ.resources[resource]);
+      }
+    }
+    
+    return true;
+  }
+  
+  forceDiplomaticStatus(civ1Id, civ2Id, status) {
+    // Force a diplomatic status between two civilizations
+    const civ1 = this.gameEngine.civilizations.find(c => c.id === civ1Id);
+    const civ2 = this.gameEngine.civilizations.find(c => c.id === civ2Id);
+    
+    if (!civ1 || !civ2) {
+      return false;
+    }
+    
+    this.logger.info(`Forcing diplomatic status between ${civ1Id} and ${civ2Id}: ${status}`);
+    
+    // Update diplomatic relations
+    civ1.setDiplomaticStatus(civ2Id, status);
+    civ2.setDiplomaticStatus(civ1Id, status);
+    
+    // Add event to log
+    this.gameEngine.eventLog.push({
+      turn: this.currentTurn,
+      type: 'forced-diplomatic-status',
+      civ1Id,
+      civ2Id,
+      status,
+      description: `Diplomatic status between ${this.gameEngine._getCivName(civ1Id)} and ${this.gameEngine._getCivName(civ2Id)} was set to ${status}`,
+      isForced: true
+    });
+    
+    return true;
+  }
+}
+
+module.exports = GameCoordinator;
