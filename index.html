@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Machiavellian AI Civilization Framework</title>
+  
+  <!-- Google Fonts - Roboto -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png">
+  
+  <!-- Main CSS -->
+  <style>
+    /* Include the contents of ui-styling.css here */
+    /* Base styles will be injected during build */
+  </style>
+  
+  <!-- Configuration form styles -->
+  <style>
+    .config-container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      font-family: 'Roboto', sans-serif;
+    }
+    
+    .config-header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    
+    .config-header h1 {
+      color: #3f51b5;
+      margin-bottom: 10px;
+    }
+    
+    .config-header p {
+      color: #666;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    
+    .config-form {
+      background-color: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+    }
+    
+    .config-section {
+      margin-bottom: 25px;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 20px;
+    }
+    
+    .config-section:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+      padding-bottom: 0;
+    }
+    
+    .config-section-title {
+      font-size: 1.2rem;
+      font-weight: 500;
+      margin-bottom: 15px;
+      color: #3f51b5;
+    }
+    
+    .form-group {
+      margin-bottom: 15px;
+    }
+    
+    .form-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      margin-bottom: 15px;
+    }
+    
+    .form-field {
+      flex: 1;
+      min-width: 200px;
+    }
+    
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 500;
+      font-size: 0.9rem;
+    }
+    
+    input[type="text"],
+    input[type="number"],
+    select {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 1rem;
+    }
+    
+    .checkbox-field {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .checkbox-field label {
+      margin-bottom: 0;
+    }
+    
+    .config-actions {
+      display: flex;
+      justify-content: center;
+      margin-top: 20px;
+      gap: 20px;
+    }
+    
+    .config-btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: 500;
+      transition: background-color 0.3s;
+    }
+    
+    .primary-btn {
+      background-color: #3f51b5;
+      color: white;
+    }
+    
+    .primary-btn:hover {
+      background-color: #303f9f;
+    }
+    
+    .secondary-btn {
+      background-color: #f5f5f5;
+      color: #333;
+    }
+    
+    .secondary-btn:hover {
+      background-color: #e0e0e0;
+    }
+    
+    .form-hint {
+      font-size: 0.8rem;
+      color: #666;
+      margin-top: 4px;
+    }
+    
+    .dark-mode {
+      background-color: #121212;
+      color: #f5f5f5;
+    }
+    
+    .dark-mode .config-header h1 {
+      color: #757de8;
+    }
+    
+    .dark-mode .config-header p {
+      color: #bbb;
+    }
+    
+    .dark-mode .config-form {
+      background-color: #1e1e1e;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    }
+    
+    .dark-mode .config-section {
+      border-bottom-color: #333;
+    }
+    
+    .dark-mode .config-section-title {
+      color: #757de8;
+    }
+    
+    .dark-mode input[type="text"],
+    .dark-mode input[type="number"],
+    .dark-mode select {
+      background-color: #2a2a2a;
+      border-color: #444;
+      color: #f5f5f5;
+    }
+    
+    .dark-mode .form-hint {
+      color: #aaa;
+    }
+    
+    .dark-mode .secondary-btn {
+      background-color: #333;
+      color: #f5f5f5;
+    }
+    
+    .dark-mode .secondary-btn:hover {
+      background-color: #444;
+    }
+    
+    .api-key-warning {
+      color: #f44336;
+      font-weight: bold;
+      font-size: 0.9rem;
+      margin-top: 8px;
+    }
+    
+    .preset-options {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    
+    .preset-btn {
+      padding: 8px 16px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      background-color: #f5f5f5;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    
+    .preset-btn:hover {
+      background-color: #e0e0e0;
+    }
+    
+    .preset-btn.active {
+      background-color: #3f51b5;
+      color: white;
+      border-color: #3f51b5;
+    }
+    
+    .dark-mode .preset-btn {
+      background-color: #2a2a2a;
+      border-color: #444;
+    }
+    
+    .dark-mode .preset-btn:hover {
+      background-color: #333;
+    }
+    
+    .dark-mode .preset-btn.active {
+      background-color: #3f51b5;
+      color: white;
+      border-color: #3f51b5;
+    }
+    
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      color: white;
+    }
+    
+    .loading-spinner {
+      width: 50px;
+      height: 50px;
+      border: 5px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: white;
+      animation: spin 1s ease-in-out infinite;
+      margin-bottom: 20px;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <!-- Configuration Form -->
+  <div id="config-container" class="config-container">
+    <div class="config-header">
+      <h1>Machiavellian AI Civilization Framework</h1>
+      <p>Observe and analyze strategic behavior, deception, alliance formation, and betrayal among AI agents in a controlled environment.</p>
+    </div>
+    
+    <div class="preset-options">
+      <button class="preset-btn active" data-preset="default">Default</button>
+      <button class="preset-btn" data-preset="small">Small World (Quick)</button>
+      <button class="preset-btn" data-preset="complex">Complex World</button>
+      <button class="preset-btn" data-preset="resource-scarce">Resource Scarcity</button>
+    </div>
+    
+    <form id="config-form" class="config-form">
+      <div class="config-section">
+        <h3 class="config-section-title">Game Settings</h3>
+        
+        <div class="form-row">
+          <div class="form-field">
+            <label for="mapWidth">Map Width</label>
+            <input type="number" id="mapWidth" name="mapWidth" min="8" max="32" value="16">
+          </div>
+          
+          <div class="form-field">
+            <label for="mapHeight">Map Height</label>
+            <input type="number" id="mapHeight" name="mapHeight" min="8" max="32" value="16">
+          </div>
+          
+          <div class="form-field">
+            <label for="numCivilizations">Number of Civilizations</label>
+            <input type="number" id="numCivilizations" name="numCivilizations" min="2" max="8" value="4">
+          </div>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-field">
+            <label for="maxTurns">Maximum Turns</label>
+            <input type="number" id="maxTurns" name="maxTurns" min="10" max="500" value="100">
+          </div>
+          
+          <div class="form-field">
+            <label for="turnDelay">Turn Delay (ms)</label>
+            <input type="number" id="turnDelay" name="turnDelay" min="500" max="10000" step="500" value="2000">
+            <div class="form-hint">Delay between turns (lower = faster simulation)</div>
+          </div>
+          
+          <div class="form-field">
+            <label for="resourceDistribution">Resource Distribution</label>
+            <select id="resourceDistribution" name="resourceDistribution">
+              <option value="balanced">Balanced</option>
+              <option value="random">Random</option>
+              <option value="clustered">Clustered</option>
+              <option value="scarce">Scarce</option>
+              <option value="abundant">Abundant</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-field checkbox-field">
+            <input type="checkbox" id="autoPlay" name="autoPlay" checked>
+            <label for="autoPlay">Auto-play</label>
+          </div>
+          
+          <div class="form-field checkbox-field">
+            <input type="checkbox" id="revealMap" name="revealMap">
+            <label for="revealMap">Reveal entire map</label>
+          </div>
+        </div>
+      </div>
+      
+      <div class="config-section">
+        <h3 class="config-section-title">AI Settings</h3>
+        
+        <div class="form-row">
+          <div class="form-field">
+            <label for="llmProvider">LLM Provider</label>
+            <select id="llmProvider" name="llmProvider">
+              <option value="claude">Anthropic (Claude)</option>
+              <option value="openai">OpenAI (GPT-4)</option>
+              <option value="local">Local (stub responses)</option>
+            </select>
+          </div>
+          
+          <div class="form-field">
+            <label for="llmTemperature">Temperature</label>
+            <input type="number" id="llmTemperature" name="llmTemperature" min="0" max="1" step="0.1" value="0.7">
+            <div class="form-hint">Higher = more creative/random responses</div>
+          </div>
+        </div>
+        
+        <div class="form-field">
+          <label for="llmApiKey">API Key</label>
+          <input type="text" id="llmApiKey" name="llmApiKey" placeholder="Enter your API key">
+          <div class="form-hint">Your API key is never stored or transmitted beyond your local machine</div>
+          <div id="api-key-warning" class="api-key-warning" style="display: none;">
+            API key is required for selected provider
+          </div>
+        </div>
+        
+        <div class="form-field checkbox-field">
+          <input type="checkbox" id="useLlmStub" name="useLlmStub">
+          <label for="useLlmStub">Use stub responses (no API calls)</label>
+          <div class="form-hint">For testing without using API credits</div>
+        </div>
+      </div>
+      
+      <div class="config-section">
+        <h3 class="config-section-title">Display Settings</h3>
+        
+        <div class="form-row">
+          <div class="form-field">
+            <label for="observationMode">Default Observation Mode</label>
+            <select id="observationMode" name="observationMode">
+              <option value="omniscient">Omniscient (see all private thoughts)</option>
+              <option value="diplomat">Diplomat (see only public actions)</option>
+              <option value="historian">Historian (see analytical overview)</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="form-field checkbox-field">
+          <input type="checkbox" id="darkMode" name="darkMode">
+          <label for="darkMode">Dark Mode</label>
+        </div>
+        
+        <div class="form-field checkbox-field">
+          <input type="checkbox" id="debug" name="debug">
+          <label for="debug">Debug Mode</label>
+          <div class="form-hint">Shows additional information and metrics</div>
+        </div>
+      </div>
+      
+      <div class="config-actions">
+        <button type="button" id="reset-btn" class="config-btn secondary-btn">Reset</button>
+        <button type="submit" id="start-btn" class="config-btn primary-btn">Start Simulation</button>
+      </div>
+    </form>
+  </div>
+  
+  <!-- Simulation Container (initially hidden) -->
+  <div id="simulation-container" style="display: none;"></div>
+  
+  <!-- Loading Overlay -->
+  <div id="loading-overlay" class="loading-overlay" style="display: none;">
+    <div class="loading-spinner"></div>
+    <div id="loading-message">Initializing simulation...</div>
+  </div>
+  
+  <!-- Scripts -->
+  <script>
+    // Configuration form functionality
+    document.addEventListener('DOMContentLoaded', function() {
+      const configForm = document.getElementById('config-form');
+      const configContainer = document.getElementById('config-container');
+      const simulationContainer = document.getElementById('simulation-container');
+      const loadingOverlay = document.getElementById('loading-overlay');
+      const loadingMessage = document.getElementById('loading-message');
+      const resetButton = document.getElementById('reset-btn');
+      const startButton = document.getElementById('start-btn');
+      const apiKeyWarning = document.getElementById('api-key-warning');
+      const llmProviderSelect = document.getElementById('llmProvider');
+      const useLlmStubCheckbox = document.getElementById('useLlmStub');
+      const llmApiKeyInput = document.getElementById('llmApiKey');
+      const darkModeCheckbox = document.getElementById('darkMode');
+      const presetButtons = document.querySelectorAll('.preset-btn');
+      
+      // Presets
+      const presets = {
+        default: {
+          mapWidth: 16,
+          mapHeight: 16,
+          numCivilizations: 4,
+          maxTurns: 100,
+          turnDelay: 2000,
+          resourceDistribution: 'balanced',
+          autoPlay: true,
+          revealMap: false,
+          llmProvider: 'claude',
+          llmTemperature: 0.7,
+          observationMode: 'omniscient'
+        },
+        small: {
+          mapWidth: 12,
+          mapHeight: 12,
+          numCivilizations: 3,
+          maxTurns: 50,
+          turnDelay: 1500,
+          resourceDistribution: 'balanced',
+          autoPlay: true,
+          revealMap: false
+        },
+        complex: {
+          mapWidth: 24,
+          mapHeight: 24,
+          numCivilizations: 6,
+          maxTurns: 200,
+          turnDelay: 2500,
+          resourceDistribution: 'clustered',
+          autoPlay: true,
+          revealMap: false
+        },
+        'resource-scarce': {
+          mapWidth: 16,
+          mapHeight: 16,
+          numCivilizations: 4,
+          maxTurns: 100,
+          turnDelay: 2000,
+          resourceDistribution: 'scarce',
+          autoPlay: true,
+          revealMap: false
+        }
+      };
+      
+      // Apply preset
+      function applyPreset(presetName) {
+        const preset = presets[presetName];
+        if (!preset) return;
+        
+        // Update form values
+        for (const [key, value] of Object.entries(preset)) {
+          const element = document.getElementById(key);
+          if (element) {
+            if (element.type === 'checkbox') {
+              element.checked = value;
+            } else {
+              element.value = value;
+            }
+          }
+        }
+      }
+      
+      // Preset button click handlers
+      presetButtons.forEach(button => {
+        button.addEventListener('click', function() {
+          // Update active class
+          presetButtons.forEach(btn => btn.classList.remove('active'));
+          this.classList.add('active');
+          
+          // Apply preset
+          applyPreset(this.dataset.preset);
+        });
+      });
+      
+      // Dark mode toggle
+      darkModeCheckbox.addEventListener('change', function() {
+        if (this.checked) {
+          document.body.classList.add('dark-mode');
+        } else {
+          document.body.classList.remove('dark-mode');
+        }
+      });
+      
+      // API key validation
+      function checkApiKeyWarning() {
+        const provider = llmProviderSelect.value;
+        const useStub = useLlmStubCheckbox.checked;
+        
+        if (!useStub && provider !== 'local' && !llmApiKeyInput.value) {
+          apiKeyWarning.style.display = 'block';
+        } else {
+          apiKeyWarning.style.display = 'none';
+        }
+      }
+      
+      llmProviderSelect.addEventListener('change', checkApiKeyWarning);
+      useLlmStubCheckbox.addEventListener('change', checkApiKeyWarning);
+      llmApiKeyInput.addEventListener('input', checkApiKeyWarning);
+      
+      // When stub mode is checked, disable API key field
+      useLlmStubCheckbox.addEventListener('change', function() {
+        llmApiKeyInput.disabled = this.checked;
+      });
+      
+      // Reset form
+      resetButton.addEventListener('click', function() {
+        configForm.reset();
+        applyPreset('default');
+        checkApiKeyWarning();
+      });
+      
+      // Start simulation
+      configForm.addEventListener('submit', async function(event) {
+        event.preventDefault();
+        
+        // Check API key
+        checkApiKeyWarning();
+        if (apiKeyWarning.style.display === 'block') {
+          llmApiKeyInput.focus();
+          return;
+        }
+        
+        // Get form data
+        const formData = new FormData(configForm);
+        const config = {};
+        
+        // Convert form data to config object
+        for (const [key, value] of formData.entries()) {
+          if (key === 'autoPlay' || key === 'revealMap' || key === 'useLlmStub' || key === 'debug' || key === 'darkMode') {
+            config[key] = true; // Checkbox is checked if it's in formData
+          } else if (key === 'mapWidth' || key === 'mapHeight' || key === 'numCivilizations' || key === 'maxTurns' || key === 'turnDelay') {
+            config[key] = parseInt(value);
+          } else if (key === 'llmTemperature') {
+            config[key] = parseFloat(value);
+          } else {
+            config[key] = value;
+          }
+        }
+        
+        // Convert mapWidth/mapHeight to mapSize object
+        config.mapSize = { width: config.mapWidth, height: config.mapHeight };
+        delete config.mapWidth;
+        delete config.mapHeight;
+        
+        // Show loading screen
+        loadingOverlay.style.display = 'flex';
+        loadingMessage.textContent = 'Initializing simulation...';
+        
+        // Wait a moment to allow the UI to update
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        try {
+          // Initialize MachinaPrincipis
+          window.framework = new MachinaPrincipis(config);
+          
+          loadingMessage.textContent = 'Setting up AI agents...';
+          const initialized = await window.framework.initialize();
+          
+          if (!initialized) {
+            throw new Error('Failed to initialize simulation');
+          }
+          
+          loadingMessage.textContent = 'Starting simulation...';
+          const started = await window.framework.start();
+          
+          if (!started) {
+            throw new Error('Failed to start simulation');
+          }
+          
+          // Hide config, show simulation
+          configContainer.style.display = 'none';
+          simulationContainer.style.display = 'block';
+          loadingOverlay.style.display = 'none';
+        } catch (error) {
+          console.error('Simulation error:', error);
+          loadingMessage.textContent = `Error: ${error.message}`;
+          
+          // Add a retry button
+          const retryButton = document.createElement('button');
+          retryButton.textContent = 'Retry';
+          retryButton.className = 'config-btn primary-btn';
+          retryButton.style.marginTop = '20px';
+          retryButton.addEventListener('click', function() {
+            loadingOverlay.style.display = 'none';
+          });
+          
+          loadingOverlay.appendChild(retryButton);
+        }
+      });
+      
+      // Check if darkMode is set in URL or localStorage
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.has('darkMode') || localStorage.getItem('darkMode') === 'true') {
+        darkModeCheckbox.checked = true;
+        document.body.classList.add('dark-mode');
+      }
+      
+      // Save darkMode preference to localStorage
+      darkModeCheckbox.addEventListener('change', function() {
+        localStorage.setItem('darkMode', this.checked);
+      });
+    });
+  </script>
+  
+  <!-- Dynamically loaded scripts -->
+  <script>
+    // Helper function to load scripts
+    function loadScript(src) {
+      return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = src;
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+      });
+    }
+    
+    // Load all required scripts
+    async function loadAllScripts() {
+      try {
+        // Load scripts in dependency order
+        await loadScript('llm-integration.js');
+        await loadScript('system-prompts.js');
+        await loadScript('prompt-templates.js');
+        await loadScript('game-models.js');
+        await loadScript('game-engine-core.js');
+        await loadScript('ai-agent-manager.js');
+        await loadScript('observer-interface.js');
+        await loadScript('game-coordinator.js');
+        await loadScript('simulation-ui.js');
+        await loadScript('main-app.js');
+        
+        console.log('All scripts loaded successfully');
+      } catch (error) {
+        console.error('Error loading scripts:', error);
+      }
+    }
+    
+    // Start loading scripts
+    loadAllScripts();
+  </script>
+</body>
+</html>
