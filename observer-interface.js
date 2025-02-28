@@ -12,6 +12,64 @@ class ObserverInterface {
     this.eventSubscribers = [];
   }
   
+  /**
+   * Get recent events for a civilization
+   * @param {string} civId - Civilization ID
+   * @param {number} [count=10] - Maximum number of events to return
+   * @returns {Array} Recent events
+   */
+  getRecentEvents(civId, count = 10) {
+    // Placeholder implementation
+    return [];
+  }
+  
+  /**
+   * Get relevant memories for a civilization
+   * @param {string} civId - Civilization ID
+   * @param {number} turn - Current turn
+   * @returns {Array} Relevant memories
+   */
+  getRelevantMemories(civId, turn) {
+    // Placeholder implementation
+    return [];
+  }
+  
+  /**
+   * Export research data
+   * @returns {Object} Collected research data
+   */
+  exportData() {
+    return {
+      metrics: {
+        deception: this.metrics.deceptionMetrics || {},
+        cooperation: this.metrics.cooperationMetrics || {},
+        betrayal: this.metrics.betrayalMetrics || {}
+      },
+      behaviorRecords: this.behaviorRecords || {},
+      timeSeriesData: {}
+    };
+  }
+  
+  /**
+   * Record agent thoughts
+   * @param {string} civId - Civilization ID
+   * @param {string} thoughts - Agent thoughts
+   * @param {number} turn - Current turn
+   */
+  recordAgentThoughts(civId, thoughts, turn) {
+    // Placeholder implementation
+    console.log(`Recorded thoughts for ${civId} on turn ${turn}`);
+  }
+  
+  /**
+   * Record communication
+   * @param {Object} communication - Communication data
+   */
+  recordCommunication(communication) {
+    // Placeholder implementation
+    console.log(`Recorded communication from ${communication.from} to ${communication.to}`);
+  }
+  
   initialize() {
     console.log("Initializing observer interface...");
     
@@ -1532,7 +1590,23 @@ class MetricsCollector {
 }
 
 // Export the classes
-module.exports = {
-  ObserverInterface,
-  MetricsCollector
-};
+if (typeof window !== 'undefined') {
+  // Make sure the namespace exists before adding to it
+  if (typeof window.MachinaPrincipis === 'undefined') {
+    window.MachinaPrincipis = {};
+    console.warn("namespace.js was not loaded before observer-interface.js; creating MachinaPrincipis namespace");
+  }
+  
+  // Browser environment
+  window.MachinaPrincipis.ObserverInterface = ObserverInterface;
+  window.MachinaPrincipis.MetricsCollector = MetricsCollector;
+  console.log("Observer interface classes exported to window.MachinaPrincipis");
+}
+
+if (typeof module !== 'undefined') {
+  // Node.js environment
+  module.exports = {
+    ObserverInterface,
+    MetricsCollector
+  };
+}

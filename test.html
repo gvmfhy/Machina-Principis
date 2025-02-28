@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Machina Principis Test</title>
+</head>
+<body>
+  <h1>Machina Principis Test Page</h1>
+  <p>This is a simple test page to verify that all scripts load correctly.</p>
+  <button onclick="testFramework()">Test Framework</button>
+  <div id="results"></div>
+
+  <!-- Load scripts directly in the correct order, ensuring namespace.js loads first -->
+  <script src="namespace.js"></script>
+  <script src="system-prompts.js"></script>
+  <script src="prompt-template.js"></script>
+  <script src="game-model.js"></script>
+  <script src="game-engine-core.js"></script>
+  <script src="llm-client-stub.js"></script>
+  <script src="observer-interface.js"></script>
+  <script src="AI-agent-manager.js"></script>
+  <script src="llm-integration.js"></script>
+  <script src="game-coordinator.js"></script>
+  <script src="simulation-ui.js"></script>
+  <script src="main-app.js"></script>
+
+  <script>
+    function addResult(text, isError = false) {
+      const results = document.getElementById('results');
+      const div = document.createElement('div');
+      div.textContent = text;
+      if (isError) {
+        div.style.color = 'red';
+      } else {
+        div.style.color = 'green';
+      }
+      results.appendChild(div);
+    }
+
+    function testFramework() {
+      // First check if the namespace exists
+      if (!window.MachinaPrincipis) {
+        addResult("Missing namespace: MachinaPrincipis", true);
+        return;
+      } else {
+        addResult("Found namespace: MachinaPrincipis");
+      }
+      
+      // Check if all required classes are available in the namespace
+      const requiredClasses = [
+        'SystemPrompts', 
+        'PromptTemplates', 
+        'GameMap', 
+        'GameEngine', 
+        'EnhancedLLMClient', 
+        'GameCoordinator', 
+        'SimulationUI', 
+        'App'
+      ];
+      
+      let allClassesLoaded = true;
+      
+      requiredClasses.forEach(className => {
+        if (!window.MachinaPrincipis[className]) {
+          addResult(`Missing required class: MachinaPrincipis.${className}`, true);
+          allClassesLoaded = false;
+        } else {
+          addResult(`Found MachinaPrincipis.${className}`);
+        }
+      });
+      
+      if (allClassesLoaded) {
+        addResult("All required classes are available in the namespace!");
+        // Try to create the main class
+        try {
+          const config = {
+            mapSize: { width: 10, height: 10 },
+            numCivilizations: 2,
+            maxTurns: 50,
+            useLlmStub: true
+          };
+          
+          // Check if initialize function exists
+          if (typeof window.MachinaPrincipis.initialize === 'function') {
+            const framework = window.MachinaPrincipis.initialize(config);
+            addResult("Successfully created MachinaPrincipis instance using initialize()");
+          } else {
+            // Fallback to direct instantiation
+            const framework = new window.MachinaPrincipis.App(config);
+            addResult("Successfully created MachinaPrincipis instance using new App()");
+          }
+        } catch (e) {
+          addResult(`Error creating MachinaPrincipis: ${e.message}`, true);
+          console.error(e);
+        }
+      } else {
+        addResult("Some classes are missing! The application won't work correctly.", true);
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>MachinaPrincipis Initialize Test</title>
+</head>
+<body>
+  <h1>MachinaPrincipis Initialize Test</h1>
+  <button onclick="testInitialize()">Test Initialize</button>
+  <pre id="output"></pre>
+
+  <!-- Load scripts in the correct order -->
+  <script src="namespace.js"></script>
+  <script src="system-prompts.js"></script>
+  <script src="prompt-template.js"></script>
+  <script src="game-model.js"></script>
+  <script src="game-engine-core.js"></script>
+  <script src="llm-client-stub.js"></script>
+  <script src="observer-interface.js"></script>
+  <script src="AI-agent-manager.js"></script>
+  <script src="llm-integration.js"></script>
+  <script src="game-coordinator.js"></script>
+  <script src="simulation-ui.js"></script>
+  <script src="main-app.js"></script>
+
+  <script>
+    function log(message) {
+      const output = document.getElementById('output');
+      output.textContent += message + '\n';
+      console.log(message);
+    }
+
+    function testInitialize() {
+      log('Testing MachinaPrincipis.initialize...');
+      
+      try {
+        // Test if MachinaPrincipis exists
+        if (typeof window.MachinaPrincipis === 'function') {
+          log('✅ MachinaPrincipis is a function');
+        } else {
+          log('❌ MachinaPrincipis is not a function');
+        }
+        
+        // Test if initialize exists
+        if (typeof window.MachinaPrincipis.initialize === 'function') {
+          log('✅ MachinaPrincipis.initialize is a function');
+        } else {
+          log('❌ MachinaPrincipis.initialize is not a function');
+        }
+        
+        // Test if EnhancedLLMClient exists
+        const LLMClient = window.MachinaPrincipis.EnhancedLLMClient || window.EnhancedLLMClient;
+        if (LLMClient) {
+          log('✅ EnhancedLLMClient found');
+        } else {
+          log('❌ EnhancedLLMClient not found');
+        }
+        
+        // Try to initialize
+        try {
+          const framework = window.MachinaPrincipis.initialize({
+            useLlmStub: true,
+            mapSize: { width: 8, height: 8 },
+            numCivilizations: 2
+          });
+          
+          log('✅ Successfully called MachinaPrincipis.initialize()');
+          log(`Framework object: ${typeof framework}`);
+          
+          for (const key in framework) {
+            log(`- ${key}: ${typeof framework[key]}`);
+          }
+        } catch (e) {
+          log(`❌ Error calling initialize: ${e.message}`);
+        }
+      } catch (e) {
+        log(`Error in test: ${e.message}`);
+      }
+    }
+  </script>
+</body>
+</html>

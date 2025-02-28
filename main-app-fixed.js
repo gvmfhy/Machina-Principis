@@ -1,3 +1,12 @@
+// Fix for script loading issues
+const SystemPrompts = window.SystemPrompts || {};
+const PromptTemplates = window.PromptTemplates || {};
+const GameMap = window.GameMap || {};
+const GameCoordinator = window.GameCoordinator || {};
+const SimulationUI = window.SimulationUI || {};
+const EnhancedLLMClient = window.EnhancedLLMClient || {};
+
+// Original file content follows
 // Machiavellian AI Civilization Framework - Main Application
 // This is the entry point that sets up and runs the simulation
 
@@ -6,14 +15,14 @@ if (typeof require !== 'undefined') {
   // Node.js environment
   try {
     const gameCoordinator = require('./game-coordinator');
-    const GameCoordinator = gameCoordinator.GameCoordinator || gameCoordinator;
+    var GameCoordinator = gameCoordinator.GameCoordinator || gameCoordinator;
     
     const llmIntegration = require('./llm-integration');
-    const EnhancedLLMClient = llmIntegration.EnhancedLLMClient || llmIntegration;
+    var EnhancedLLMClient = llmIntegration.EnhancedLLMClient || llmIntegration;
     
     // Node-specific imports
-    const dotenv = require('dotenv');
-    const SimulationUI = require('./simulation-ui');
+    var dotenv = require('dotenv');
+    var SimulationUI = require('./simulation-ui');
     
     // Configure environment variables
     if (dotenv) dotenv.config();
@@ -21,7 +30,6 @@ if (typeof require !== 'undefined') {
     console.error('Error importing Node.js dependencies:', e);
   }
 }
-// Browser environment - we'll use window.MachinaPrincipis namespace directly
 // Browser environment - no declarations needed as we'll use window.X directly
 
 // Load environment variables in Node.js only
@@ -75,17 +83,7 @@ class MachinaPrincipis {
     try {
       // 1. Initialize LLM client
       console.log(`Setting up LLM client (${this.config.llmProvider})...`);
-      // Check for EnhancedLLMClient in both possible locations
-      const LLMClientClass = window.MachinaPrincipis && window.MachinaPrincipis.EnhancedLLMClient 
-                            ? window.MachinaPrincipis.EnhancedLLMClient 
-                            : window.EnhancedLLMClient;
-                            
-      if (!LLMClientClass) {
-        console.error("EnhancedLLMClient not found in global scope!");
-        throw new Error("EnhancedLLMClient not found. Ensure llm-client-stub.js is loaded properly.");
-      }
-      
-      this.llmClient = new LLMClientClass({
+      this.llmClient = new window.EnhancedLLMClient({
         provider: this.config.llmProvider,
         model: this.config.llmModel,
         apiKey: this.config.llmApiKey,
@@ -103,18 +101,7 @@ class MachinaPrincipis {
       
       // 2. Initialize game coordinator
       console.log("Setting up game coordinator...");
-      
-      // Check for GameCoordinator in both possible locations
-      const GameCoordinatorClass = window.MachinaPrincipis && window.MachinaPrincipis.GameCoordinator 
-                               ? window.MachinaPrincipis.GameCoordinator 
-                               : window.GameCoordinator;
-                               
-      if (!GameCoordinatorClass) {
-        console.error("GameCoordinator not found in global scope!");
-        throw new Error("GameCoordinator not found. Ensure game-coordinator.js is loaded properly.");
-      }
-      
-      this.gameCoordinator = new GameCoordinatorClass({
+      this.gameCoordinator = new window.GameCoordinator({
         mapSize: this.config.mapSize,
         numCivilizations: this.config.numCivilizations,
         maxTurns: this.config.maxTurns,
@@ -137,18 +124,7 @@ class MachinaPrincipis {
       // 3. Initialize UI if running in browser
       if (typeof window !== 'undefined') {
         console.log("Setting up user interface...");
-        
-        // Check for SimulationUI in both possible locations
-        const SimulationUIClass = window.MachinaPrincipis && window.MachinaPrincipis.SimulationUI 
-                                ? window.MachinaPrincipis.SimulationUI 
-                                : window.SimulationUI;
-                                
-        if (!SimulationUIClass) {
-          console.error("SimulationUI not found in global scope!");
-          throw new Error("SimulationUI not found. Ensure simulation-ui.js is loaded properly.");
-        }
-        
-        this.ui = new SimulationUIClass(this.gameCoordinator, {
+        this.ui = new window.SimulationUI(this.gameCoordinator, {
           containerId: this.config.containerId,
           darkMode: this.config.darkMode,
           showFPS: this.config.debug
@@ -267,20 +243,8 @@ class MachinaPrincipis {
 
 // Always export to window in browser environment
 if (typeof window !== 'undefined') {
-  // Make sure the namespace object exists
-  if (!window.MachinaPrincipis) {
-    window.MachinaPrincipis = {};
-  }
-  
-  // Add the initialize function and App class directly to the namespace
-  window.MachinaPrincipis.App = MachinaPrincipis;
-  window.MachinaPrincipis.initialize = function(config) {
-    return new MachinaPrincipis(config);
-  };
-  
-  // For debugging
-  console.log("MachinaPrincipis.initialize function added:", typeof window.MachinaPrincipis.initialize);
-  console.log("MachinaPrincipis object:", window.MachinaPrincipis);
+  window.MachinaPrincipis = MachinaPrincipis;
+  console.log("MachinaPrincipis class exported to window object");
 }
 
 // Node.js export
@@ -318,7 +282,8 @@ if (typeof require !== 'undefined' && require.main === module) {
       
       // In CLI mode, listen for exit signal
       process.on('SIGINT', () => {
-        console.log("\nReceived exit signal. Stopping simulation...");
+        console.log("
+Received exit signal. Stopping simulation...");
         framework.stop();
         framework.exportResults();
         process.exit(0);

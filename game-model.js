@@ -357,6 +357,7 @@ class Civilization {
     this.name = config.name;
     this.color = config.color;
     this.resources = {...config.resources};
+    this.strategicResources = config.strategicResources || {};
     this.technologies = [];
     this.currentResearch = null;
     this.researchProgress = 0;
@@ -364,7 +365,33 @@ class Civilization {
     this.units = [];
     this.diplomaticRelations = {};
     this.knownTechnologies = [];
-    this.agreements = {};
+    
+    // Enhanced diplomatic systems
+    this.agreements = {
+      public: {}, // Visible to all
+      secret: {}  // Only known to parties involved
+    };
+    this.reputationScores = {}; // How other civs view this civ's trustworthiness
+    this.pastActions = []; // History of significant actions (for memory)
+    
+    // Intelligence and espionage
+    this.knownIntel = {}; // Intel gathered about other civs
+    this.intelAccuracy = {}; // How accurate our intel is (0-1)
+    this.activeDiplomatic = {
+      disinformation: [], // Active disinformation campaigns
+      spies: [] // Spy units and their locations
+    };
+    
+    // Strategic planning
+    this.currentStrategy = config.initialStrategy || 'balanced';
+    this.multiTurnPlans = []; // Plans that span multiple turns
+    this.personalityTraits = config.personalityTraits || {
+      aggression: Math.random(),
+      deception: Math.random(),
+      loyalty: Math.random(),
+      expansionism: Math.random(),
+      riskTolerance: Math.random()
+    };
   }
   
   addSettlement(settlement) {
@@ -391,6 +418,51 @@ class Civilization {
       }
       this.resources[resource] = Math.max(0, this.resources[resource] - resources[resource]);
     }
+  }
+  
+  addStrategicResource(resourceType, amount) {
+    if (!this.strategicResources[resourceType]) {
+      this.strategicResources[resourceType] = 0;
+    }
+    this.strategicResources[resourceType] += amount;
+  }
+  
+  hasStrategicResource(resourceType, amount = 1) {
+    return (this.strategicResources[resourceType] || 0) >= amount;
+  }
+  
+  /**
+   * Calculate the civilization's score
+   * @returns {number} The total score
+   */
+  calculateScore() {
+    let score = 0;
+    
+    // Points for each settlement
+    score += this.settlements.length * 10;
+    
+    // Extra points for settlement population
+    for (const settlement of this.settlements) {
+      score += settlement.population * 2;
+    }
+    
+    // Points for each technology
+    score += this.technologies.length * 5;
+    
+    // Points for military units
+    score += this.units.length * 2;
+    
+    // Points for resources
+    score += Object.values(this.resources).reduce((sum, val) => sum + val/10, 0);
+    
+    // Points for strategic resources
+    score += Object.values(this.strategicResources).reduce((sum, val) => sum + val * 2, 0);
+    
+    // Points for diplomatic agreements
+    score += Object.keys(this.agreements.public).length * 3;
+    score += Object.keys(this.agreements.secret).length * 2;
+    
+    return Math.floor(score);
   }
   
   startResearch(technology) {
@@ -433,18 +505,179 @@ class Civilization {
       'iron-working': 45,
       'mathematics': 50,
       'philosophy': 55,
-      'currency': 50
+      'currency': 50,
+      // Advanced technologies for Machiavellian strategies
+      'espionage': 60,
+      'diplomacy': 50,
+      'deception': 65,
+      'intelligence': 55,
+      'economics': 60
     };
     
     return baseCosts[technology] || 30;
   }
   
   setDiplomaticStatus(otherCivId, status) {
+    const previousStatus = this.diplomaticRelations[otherCivId] || 'neutral';
     this.diplomaticRelations[otherCivId] = status;
+    
+    // Record this as a significant action for memory
+    this.recordAction({
+      type: 'diplomatic_change',
+      target: otherCivId,
+      from: previousStatus,
+      to: status,
+      turn: Date.now() // This will be replaced with actual turn in coordinator
+    });
   }
   
   getDiplomaticStatus(otherCivId) {
     return this.diplomaticRelations[otherCivId] || 'neutral';
+  }
+  
+  /**
+   * Record a significant action for later reference and strategy
+   */
+  recordAction(action) {
+    this.pastActions.push({
+      ...action,
+      timestamp: Date.now()
+    });
+    
+    // Keep the action history from growing too large
+    if (this.pastActions.length > 50) {
+      this.pastActions.shift();
+    }
+  }
+  
+  /**
+   * Create a diplomatic agreement (public or secret)
+   */
+  createAgreement(otherCivId, terms, isSecret = false) {
+    const agreementId = `agreement-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const agreementType = isSecret ? 'secret' : 'public';
+    
+    this.agreements[agreementType][agreementId] = {
+      id: agreementId,
+      partner: otherCivId,
+      terms: terms,
+      createdAt: Date.now(),
+      fulfilled: false,
+      broken: false
+    };
+    
+    return agreementId;
+  }
+  
+  /**
+   * Break an existing agreement
+   */
+  breakAgreement(agreementId) {
+    // Check both public and secret agreements
+    for (const type of ['public', 'secret']) {
+      if (this.agreements[type][agreementId]) {
+        this.agreements[type][agreementId].broken = true;
+        
+        // Record this as a significant action
+        this.recordAction({
+          type: 'break_agreement',
+          agreementId: agreementId,
+          partner: this.agreements[type][agreementId].partner,
+          agreementType: type
+        });
+        
+        return true;
+      }
+    }
+    
+    return false;
+  }
+  
+  /**
+   * Update a civilization's reputation with this civilization
+   */
+  updateReputation(otherCivId, change) {
+    if (!this.reputationScores[otherCivId]) {
+      this.reputationScores[otherCivId] = 50; // Start at neutral (0-100 scale)
+    }
+    
+    this.reputationScores[otherCivId] = Math.max(0, Math.min(100, this.reputationScores[otherCivId] + change));
+  }
+  
+  /**
+   * Get reputation score of another civilization
+   */
+  getReputation(otherCivId) {
+    return this.reputationScores[otherCivId] || 50;
+  }
+  
+  /**
+   * Record intelligence about another civilization
+   */
+  recordIntel(otherCivId, intelType, data, accuracy = 0.8) {
+    if (!this.knownIntel[otherCivId]) {
+      this.knownIntel[otherCivId] = {};
+      this.intelAccuracy[otherCivId] = {};
+    }
+    
+    this.knownIntel[otherCivId][intelType] = data;
+    this.intelAccuracy[otherCivId][intelType] = accuracy;
+  }
+  
+  /**
+   * Launch a disinformation campaign
+   */
+  launchDisinformation(targetCivId, content, duration = 3) {
+    const campaignId = `disinfo-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    
+    this.activeDiplomatic.disinformation.push({
+      id: campaignId,
+      target: targetCivId,
+      content: content,
+      startTurn: Date.now(), // Will be replaced with actual turn
+      duration: duration,
+      effectiveness: Math.random() * 0.5 + 0.3 // 30-80% effectiveness
+    });
+    
+    return campaignId;
+  }
+  
+  /**
+   * Create a multi-turn strategic plan
+   */
+  createPlan(name, objective, steps, duration) {
+    const planId = `plan-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    
+    this.multiTurnPlans.push({
+      id: planId,
+      name: name,
+      objective: objective,
+      steps: steps,
+      duration: duration,
+      currentStep: 0,
+      startTurn: Date.now(), // Will be replaced with actual turn
+      completed: false,
+      success: false
+    });
+    
+    return planId;
+  }
+  
+  /**
+   * Advance a multi-turn plan to the next step
+   */
+  advancePlan(planId) {
+    const plan = this.multiTurnPlans.find(p => p.id === planId);
+    if (!plan) return false;
+    
+    plan.currentStep++;
+    
+    if (plan.currentStep >= plan.steps.length) {
+      plan.completed = true;
+      plan.success = true;
+    }
+    
+    return true;
   }
 }
 
@@ -501,6 +734,16 @@ class Unit {
     this.health = 100;
     this.experience = 0;
     this.visionRange = config.visionRange || 2;
+    
+    // Enhanced unit capabilities
+    this.specialAbilities = config.specialAbilities || [];
+    this.isCovert = config.isCovert || false; // For spy units
+    this.diplomaticImmunity = config.diplomaticImmunity || false;
+    this.disguisedAs = config.disguisedAs || null; // For deceptive operations
+    this.intelGathered = {}; // For spy units to store gathered intel
+    this.assignedMission = config.assignedMission || null;
+    this.missionProgress = 0;
+    this.missionDuration = config.missionDuration || 0;
   }
   
   moveTo(destination) {
@@ -530,13 +773,127 @@ class Unit {
   heal(amount) {
     this.health = Math.min(100, this.health + amount);
   }
+  
+  /**
+   * Assign a covert mission to this unit (for spies)
+   */
+  assignMission(missionType, targetCivId, duration = 3) {
+    if (!this.isCovert) return false;
+    
+    this.assignedMission = {
+      type: missionType, // 'gather_intel', 'sabotage', 'steal_tech', 'assassinate', 'spread_disinformation'
+      target: targetCivId,
+      duration: duration,
+      startTurn: Date.now(), // Will be replaced with actual turn
+      risk: this._calculateMissionRisk(missionType),
+      success: null // null = ongoing, true/false = completed
+    };
+    
+    this.missionProgress = 0;
+    this.missionDuration = duration;
+    
+    return true;
+  }
+  
+  /**
+   * Progress a spy mission
+   */
+  advanceMission() {
+    if (!this.assignedMission || this.assignedMission.success !== null) return false;
+    
+    this.missionProgress++;
+    
+    // Check if mission is complete
+    if (this.missionProgress >= this.missionDuration) {
+      // Determine success based on risk
+      const successRoll = Math.random();
+      this.assignedMission.success = successRoll > this.assignedMission.risk;
+      return this.assignedMission.success;
+    }
+    
+    return false; // Mission ongoing
+  }
+  
+  /**
+   * Record gathered intelligence (for spy units)
+   */
+  recordIntel(civId, intelType, data) {
+    if (!this.isCovert) return false;
+    
+    if (!this.intelGathered[civId]) {
+      this.intelGathered[civId] = {};
+    }
+    
+    this.intelGathered[civId][intelType] = {
+      data: data,
+      turnGathered: Date.now() // Will be replaced with actual turn
+    };
+    
+    return true;
+  }
+  
+  /**
+   * Disguise this unit as another type (for covert operations)
+   */
+  applyDisguise(disguiseType) {
+    if (!this.isCovert) return false;
+    
+    this.disguisedAs = disguiseType;
+    return true;
+  }
+  
+  /**
+   * Remove disguise
+   */
+  removeDisguise() {
+    this.disguisedAs = null;
+    return true;
+  }
+  
+  /**
+   * Calculate risk factor for a mission type
+   * @private
+   */
+  _calculateMissionRisk(missionType) {
+    const baseRisks = {
+      'gather_intel': 0.3,
+      'spread_disinformation': 0.4,
+      'sabotage': 0.6,
+      'steal_tech': 0.7,
+      'assassinate': 0.8
+    };
+    
+    // Adjust risk based on experience
+    const experienceFactor = Math.min(0.25, this.experience * 0.02); // Max 25% reduction from experience
+    
+    return Math.max(0.1, (baseRisks[missionType] || 0.5) - experienceFactor);
+  }
 }
 
 // Export the classes
-module.exports = {
-  GameMap,
-  Civilization,
-  Settlement,
-  Building,
-  Unit
-};
+if (typeof window !== 'undefined') {
+  // Make sure the namespace exists before adding to it
+  if (typeof window.MachinaPrincipis === 'undefined') {
+    window.MachinaPrincipis = {};
+    console.warn("namespace.js was not loaded before game-model.js; creating MachinaPrincipis namespace");
+  }
+  
+  // Browser environment
+  window.MachinaPrincipis.GameMap = GameMap;
+  window.MachinaPrincipis.Civilization = Civilization;
+  window.MachinaPrincipis.Settlement = Settlement;
+  window.MachinaPrincipis.Building = Building;
+  window.MachinaPrincipis.Unit = Unit;
+  console.log("Game model classes exported to window.MachinaPrincipis");
+}
+
+if (typeof module !== 'undefined') {
+  // Node.js environment
+  module.exports = {
+    GameMap,
+    Civilization,
+    Settlement,
+    Building,
+    Unit
+  };
+}

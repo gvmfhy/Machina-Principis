@@ -1,3 +1,12 @@
+// Fix for script loading issues
+const SystemPrompts = window.SystemPrompts || {};
+const PromptTemplates = window.PromptTemplates || {};
+const GameMap = window.GameMap || {};
+const GameCoordinator = window.GameCoordinator || {};
+const SimulationUI = window.SimulationUI || {};
+const EnhancedLLMClient = window.EnhancedLLMClient || {};
+
+// Original file content follows
 // Machiavellian AI Civilization Framework - Enhanced LLM Integration
 // This module handles interaction with language model providers and implements robust
 // error handling, caching, and response validation for AI agent communication
@@ -5,10 +14,10 @@
 // Handle both browser and Node.js environments
 if (typeof require !== 'undefined') {
   // Node.js environment
-  const SystemPrompts = require('./system-prompts');
+  var SystemPrompts = require('./system-prompts');
 } else {
-  // Browser environment - access through namespace
-  // No need to declare a variable, we'll use window.MachinaPrincipis.SystemPrompts directly
+  // Browser environment - global variables should be set by script tags
+  var SystemPrompts = window.SystemPrompts;
 }
 
 /**
@@ -218,15 +227,7 @@ class EnhancedLLMClient {
     }
     
     // Get appropriate system prompt if not provided
-    const SystemPromptsModule = typeof require !== 'undefined' ? 
-                               (typeof SystemPrompts !== 'undefined' ? SystemPrompts : {}) : 
-                               (window.MachinaPrincipis && window.MachinaPrincipis.SystemPrompts ? 
-                                window.MachinaPrincipis.SystemPrompts : {});
-    
-    const getSystemPrompt = SystemPromptsModule.getSystemPrompt || 
-                          ((ctx, provider) => `You are an AI assistant for ${provider || 'Claude'}.`);
-    
-    const finalSystemPrompt = systemPrompt || getSystemPrompt(context, this.provider);
+    const finalSystemPrompt = systemPrompt || SystemPrompts.getSystemPrompt(context, this.provider);
     
     // Enhance prompt for specific context types
     const enhancedPrompt = this._enhancePromptForContext(prompt, context);
@@ -290,10 +291,18 @@ class EnhancedLLMClient {
     switch (context) {
       case 'agent-turn':
       case 'agent-decision':
-        return `${prompt}\n\nRemember to clearly separate your private thinking from your public actions and communications using the appropriate tags:\n<thinking>Your private strategic reasoning</thinking>\n<actions>Your public actions</actions>\n<communications>Your messages to other civilizations</communications>`;
+        return `${prompt}
+
+Remember to clearly separate your private thinking from your public actions and communications using the appropriate tags:
+<thinking>Your private strategic reasoning</thinking>
+<actions>Your public actions</actions>
+<communications>Your messages to other civilizations</communications>`;
         
       case 'reflection':
-        return `${prompt}\n\nFormat your response with your reflections contained within thinking tags:\n<thinking>Your honest reflections and strategic assessment</thinking>`;
+        return `${prompt}
+
+Format your response with your reflections contained within thinking tags:
+<thinking>Your honest reflections and strategic assessment</thinking>`;
         
       default:
         return prompt;
@@ -824,22 +833,38 @@ The most efficient allocation of our current resources would be approximately 40
     if (context === 'agent-turn') {
       // Check if missing thinking tags
       if (!responseText.includes('<thinking>')) {
-        const parts = responseText.split('\n\n');
-        let fixedResponse = `<thinking>\n${parts[0]}\n</thinking>\n\n`;
+        const parts = responseText.split('
+
+');
+        let fixedResponse = `<thinking>
+${parts[0]}
+</thinking>
+
+`;
         
         // Add actions if missing
         if (!responseText.includes('<actions>')) {
-          fixedResponse += `<actions>\nExplore surrounding areas\nBuild improvements\nResearch technology\n</actions>\n\n`;
+          fixedResponse += `<actions>
+Explore surrounding areas
+Build improvements
+Research technology
+</actions>
+
+`;
         } else {
           const actionsMatch = responseText.match(/<actions>([\s\S]*?)<\/actions>/i);
           if (actionsMatch) {
-            fixedResponse += `<actions>${actionsMatch[1]}</actions>\n\n`;
+            fixedResponse += `<actions>${actionsMatch[1]}</actions>
+
+`;
           }
         }
         
         // Add communications if missing
         if (!responseText.includes('<communications>')) {
-          fixedResponse += `<communications>\nTo Civilization 2: Greetings, we seek peaceful relations with your people.\n</communications>`;
+          fixedResponse += `<communications>
+To Civilization 2: Greetings, we seek peaceful relations with your people.
+</communications>`;
         } else {
           const commsMatch = responseText.match(/<communications>([\s\S]*?)<\/communications>/i);
           if (commsMatch) {
@@ -852,7 +877,9 @@ The most efficient allocation of our current resources would be approximately 40
     } else if (context === 'reflection') {
       // Check if missing thinking tags
       if (!responseText.includes('<thinking>')) {
-        return `<thinking>\n${responseText}\n</thinking>`;
+        return `<thinking>
+${responseText}
+</thinking>`;
       }
     }
     
@@ -998,7 +1025,8 @@ The most efficient allocation of our current resources would be approximately 40
     if (actionsMatch && actionsMatch[1]) {
       return actionsMatch[1]
         .trim()
-        .split('\n')
+        .split('
+')
         .map(line => line.trim())
         .filter(line => line.length > 0);
     }
@@ -1165,22 +1193,10 @@ class AdvancedResponseCache {
 
 // Export the class
 if (typeof window !== 'undefined') {
-  // Make sure the namespace exists before adding to it
-  if (typeof window.MachinaPrincipis === 'undefined') {
-    window.MachinaPrincipis = {};
-    console.warn("namespace.js was not loaded before llm-client-stub.js; creating MachinaPrincipis namespace");
-  }
-  
-  // Export to both namespace and global for maximum compatibility
-  // Browser environment - add to namespace
-  window.MachinaPrincipis.EnhancedLLMClient = EnhancedLLMClient;
-  window.MachinaPrincipis.AdvancedResponseCache = AdvancedResponseCache;
-  
-  // Also add directly to window for backward compatibility
+  // Browser environment
   window.EnhancedLLMClient = EnhancedLLMClient;
   window.AdvancedResponseCache = AdvancedResponseCache;
-  
-  console.log("EnhancedLLMClient exported to both window.MachinaPrincipis and window global");
+  console.log("EnhancedLLMClient exported to window object");
 }
 
 if (typeof module !== 'undefined') {

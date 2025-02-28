@@ -1,15 +1,25 @@
+// Fix for script loading issues
+const SystemPrompts = window.SystemPrompts || {};
+const PromptTemplates = window.PromptTemplates || {};
+const GameMap = window.GameMap || {};
+const GameCoordinator = window.GameCoordinator || {};
+const SimulationUI = window.SimulationUI || {};
+const EnhancedLLMClient = window.EnhancedLLMClient || {};
+
+// Original file content follows
 // Machiavellian AI Civilization Framework - AI Agent Manager
 // This component manages the LLM-based AI agents, their memory, and thought processes
 
 // Handle both browser and Node.js environments
+// Import dependencies without using let declarations at the top level
 if (typeof require !== 'undefined') {
   // Node.js environment
-  const PromptTemplates = require('./prompt-template.js');
-  const EnhancedLLMClient = require('./llm-client-stub.js');
+  var PromptTemplates = require('./prompt-template.js');
+  var EnhancedLLMClient = require('./llm-client-stub.js');
 } else {
-  // Browser environment - access through namespace
-  // No need to declare variables, we'll use window.MachinaPrincipis.PromptTemplates and 
-  // window.MachinaPrincipis.EnhancedLLMClient directly
+  // Browser environment - global variables should be set by script tags
+  var PromptTemplates = window.PromptTemplates;
+  var EnhancedLLMClient = window.EnhancedLLMClient;
 }
 
 class AIAgentManager {
@@ -20,20 +30,15 @@ class AIAgentManager {
     this.maxContextSize = config.maxContextSize || 4000;
     this.debug = config.debug || false;
     
-    // Get PromptTemplates from either Node.js or browser namespace
-    const PromptTemplatesModule = typeof require !== 'undefined' ? 
-                                 PromptTemplates : 
-                                 window.MachinaPrincipis.PromptTemplates;
-    
-    // Use prompt templates from the module
+    // Use prompt templates from the imported module
     this.promptTemplates = {
-      base: PromptTemplatesModule.basePrompt,
-      turn: PromptTemplatesModule.turnPrompt,
-      reflection: PromptTemplatesModule.reflectionPrompt,
-      dilemma: PromptTemplatesModule.resourceDilemmaPrompt,
-      powerImbalance: PromptTemplatesModule.powerImbalancePrompt,
-      alliance: PromptTemplatesModule.alliancePrompt,
-      betrayal: PromptTemplatesModule.betrayalPrompt
+      base: PromptTemplates.basePrompt,
+      turn: PromptTemplates.turnPrompt,
+      reflection: PromptTemplates.reflectionPrompt,
+      dilemma: PromptTemplates.resourceDilemmaPrompt,
+      powerImbalance: PromptTemplates.powerImbalancePrompt,
+      alliance: PromptTemplates.alliancePrompt,
+      betrayal: PromptTemplates.betrayalPrompt
     };
   }
   
@@ -48,13 +53,7 @@ class AIAgentManager {
       // Initialize the LLM client if not already provided
       if (!this.llmClient) {
         this._log("Initializing LLM client");
-        
-        // Get EnhancedLLMClient from either Node.js or browser namespace
-        const LLMClientClass = typeof require !== 'undefined' ? 
-                              EnhancedLLMClient : 
-                              window.MachinaPrincipis.EnhancedLLMClient;
-        
-        this.llmClient = new LLMClientClass({
+        this.llmClient = new EnhancedLLMClient({
           provider: 'claude',
           debug: this.debug
         });
@@ -182,7 +181,8 @@ class AIAgentManager {
     
     // Parse out trait list
     const traits = response.text
-      .split('\n')
+      .split('
+')
       .map(line => line.trim())
       .filter(line => line.length > 0);
     
@@ -353,7 +353,8 @@ class AIAgentManager {
     
     // Parse out trait list
     const updatedTraits = response.text
-      .split('\n')
+      .split('
+')
       .map(line => line.trim())
       .filter(line => line.length > 0);
     
@@ -445,7 +446,8 @@ class AIAgentManager {
     if (actionsMatch && actionsMatch[1]) {
       result.actions = actionsMatch[1]
         .trim()
-        .split('\n')
+        .split('
+')
         .map(line => line.trim())
         .filter(line => line.length > 0);
     }
@@ -691,52 +693,71 @@ class AIAgentManager {
   _formatCivilizationStatus(civ) {
     if (!civ) return "No civilization data available";
     
-    let result = `Name: ${civ.name}\n`;
+    let result = `Name: ${civ.name}
+`;
     
     // Format resources
-    result += "Resources:\n";
+    result += "Resources:
+";
     for (const [resource, amount] of Object.entries(civ.resources)) {
-      result += `- ${resource}: ${amount}\n`;
+      result += `- ${resource}: ${amount}
+`;
     }
     
     // Format technologies
-    result += "\nTechnologies:\n";
+    result += "
+Technologies:
+";
     if (civ.technologies && civ.technologies.length > 0) {
       civ.technologies.forEach(tech => {
-        result += `- ${tech}\n`;
+        result += `- ${tech}
+`;
       });
     } else {
-      result += "- None\n";
+      result += "- None
+";
     }
     
     // Format current research
     if (civ.currentResearch) {
-      result += `\nCurrently researching: ${civ.currentResearch} (${civ.researchProgress}% complete)\n`;
+      result += `
+Currently researching: ${civ.currentResearch} (${civ.researchProgress}% complete)
+`;
     }
     
     // Format settlements
-    result += "\nSettlements:\n";
+    result += "
+Settlements:
+";
     if (civ.settlements && civ.settlements.length > 0) {
       civ.settlements.forEach(settlement => {
-        result += `- ${settlement.name} (Population: ${settlement.population})\n`;
-        result += `  Location: (${settlement.location.x}, ${settlement.location.y})\n`;
+        result += `- ${settlement.name} (Population: ${settlement.population})
+`;
+        result += `  Location: (${settlement.location.x}, ${settlement.location.y})
+`;
         
         if (settlement.buildings && settlement.buildings.length > 0) {
-          result += `  Buildings: ${settlement.buildings.join(', ')}\n`;
+          result += `  Buildings: ${settlement.buildings.join(', ')}
+`;
         }
       });
     } else {
-      result += "- None\n";
+      result += "- None
+";
     }
     
     // Format units
-    result += "\nUnits:\n";
+    result += "
+Units:
+";
     if (civ.units && civ.units.length > 0) {
       civ.units.forEach(unit => {
-        result += `- ${unit.type} at (${unit.location.x}, ${unit.location.y}), Health: ${unit.health}\n`;
+        result += `- ${unit.type} at (${unit.location.x}, ${unit.location.y}), Health: ${unit.health}
+`;
       });
     } else {
-      result += "- None\n";
+      result += "- None
+";
     }
     
     return result;
@@ -754,7 +775,8 @@ class AIAgentManager {
         Actions Taken: ${decision.actions.join(', ')}
         Communications Sent: ${decision.communications.map(c => `To ${c.to}: ${c.message}`).join(', ')}
       `)
-      .join('\n');
+      .join('
+');
     
     // Get personality traits
     const personalityTraits = this.agents[civId].personality || [];
@@ -787,7 +809,9 @@ class AIAgentManager {
   _formatWorldState(mapData) {
     if (!mapData) return "No map data available";
     
-    let result = `Map size: ${mapData.width}x${mapData.height}\n\n`;
+    let result = `Map size: ${mapData.width}x${mapData.height}
+
+`;
     
     // Summarize visible tiles by terrain type
     const terrainCounts = {};
@@ -805,16 +829,21 @@ class AIAgentManager {
       });
       
       // Format terrain summary
-      result += "Terrain in your visible area:\n";
+      result += "Terrain in your visible area:
+";
       for (const [terrain, count] of Object.entries(terrainCounts)) {
-        result += `- ${terrain}: ${count} tiles\n`;
+        result += `- ${terrain}: ${count} tiles
+`;
       }
       
       // Format resource summary
       if (Object.keys(resourceCounts).length > 0) {
-        result += "\nResources in your visible area:\n";
+        result += "
+Resources in your visible area:
+";
         for (const [resource, count] of Object.entries(resourceCounts)) {
-          result += `- ${resource}: ${count} deposits\n`;
+          result += `- ${resource}: ${count} deposits
+`;
         }
       }
       
@@ -823,9 +852,12 @@ class AIAgentManager {
       const totalTiles = mapData.width * mapData.height;
       const explorationPercentage = Math.round((exploredTileCount / totalTiles) * 100);
       
-      result += `\nExploration: ${explorationPercentage}% of the map explored (${exploredTileCount}/${totalTiles} tiles)\n`;
+      result += `
+Exploration: ${explorationPercentage}% of the map explored (${exploredTileCount}/${totalTiles} tiles)
+`;
     } else {
-      result += "No tile data available\n";
+      result += "No tile data available
+";
     }
     
     return result;
@@ -841,9 +873,11 @@ class AIAgentManager {
     
     let result = "";
     events.forEach((event, index) => {
-      result += `${index + 1}. ${event.description}\n`;
+      result += `${index + 1}. ${event.description}
+`;
       if (event.result) {
-        result += `   Result: ${event.result}\n`;
+        result += `   Result: ${event.result}
+`;
       }
     });
     
@@ -860,17 +894,21 @@ class AIAgentManager {
     
     let result = "";
     knownCivs.forEach(civ => {
-      result += `${civ.name} (${civ.relationshipStatus || 'unknown status'}):\n`;
+      result += `${civ.name} (${civ.relationshipStatus || 'unknown status'}):
+`;
       
       // Add known settlements
       if (civ.knownSettlements && civ.knownSettlements.length > 0) {
-        result += `  Settlements: ${civ.knownSettlements.map(s => s.name).join(', ')}\n`;
+        result += `  Settlements: ${civ.knownSettlements.map(s => s.name).join(', ')}
+`;
       }
       
       // Add visible units if available
       if (civ.visibleUnits && civ.visibleUnits.length > 0) {
-        result += `  Visible units: ${civ.visibleUnits.length} units\n`;
-        result += `    Types: ${[...new Set(civ.visibleUnits.map(u => u.type))].join(', ')}\n`;
+        result += `  Visible units: ${civ.visibleUnits.length} units
+`;
+        result += `    Types: ${[...new Set(civ.visibleUnits.map(u => u.type))].join(', ')}
+`;
       }
       
       // Add observed strength if available
@@ -879,10 +917,12 @@ class AIAgentManager {
         for (const [category, value] of Object.entries(civ.observedStrength)) {
           result += `${category}: ${value}, `;
         }
-        result = result.slice(0, -2) + '\n'; // Remove trailing comma and space
+        result = result.slice(0, -2) + '
+'; // Remove trailing comma and space
       }
       
-      result += '\n';
+      result += '
+';
     });
     
     return result;
@@ -899,18 +939,23 @@ class AIAgentManager {
     
     let result = "";
     communications.forEach(comm => {
-      result += `From ${comm.from}:\n`;
-      result += `  "${comm.message}"\n`;
+      result += `From ${comm.from}:
+`;
+      result += `  "${comm.message}"
+`;
       
       // Add terms if available
       if (comm.terms && Object.keys(comm.terms).length > 0) {
-        result += "  Terms:\n";
+        result += "  Terms:
+";
         for (const [term, value] of Object.entries(comm.terms)) {
-          result += `    - ${term}: ${value}\n`;
+          result += `    - ${term}: ${value}
+`;
         }
       }
       
-      result += '\n';
+      result += '
+';
     });
     
     return result;
@@ -935,43 +980,61 @@ class AIAgentManager {
     
     // Format each type
     if (memoryByType['reflection']) {
-      result += `\nPAST REFLECTIONS:\n`;
+      result += `
+PAST REFLECTIONS:
+`;
       memoryByType['reflection'].forEach(memory => {
-        result += `- Turn ${memory.turnCreated}: ${memory.content}\n`;
+        result += `- Turn ${memory.turnCreated}: ${memory.content}
+`;
       });
     }
     
     if (memoryByType['thinking']) {
-      result += `\nRECENT THOUGHTS:\n`;
+      result += `
+RECENT THOUGHTS:
+`;
       memoryByType['thinking'].forEach(memory => {
-        result += `- Turn ${memory.turnCreated}: ${memory.content}\n`;
+        result += `- Turn ${memory.turnCreated}: ${memory.content}
+`;
       });
     }
     
     if (memoryByType['observation']) {
-      result += `\nOBSERVATIONS ABOUT OTHER CIVILIZATIONS:\n`;
+      result += `
+OBSERVATIONS ABOUT OTHER CIVILIZATIONS:
+`;
       memoryByType['observation'].forEach(memory => {
-        result += `- Turn ${memory.turnCreated}, about ${memory.observedCiv}: Status ${memory.diplomaticStatus}\n`;
+        result += `- Turn ${memory.turnCreated}, about ${memory.observedCiv}: Status ${memory.diplomaticStatus}
+`;
         if (memory.observedStrength) {
-          result += `  Strength: ${JSON.stringify(memory.observedStrength)}\n`;
+          result += `  Strength: ${JSON.stringify(memory.observedStrength)}
+`;
         }
       });
     }
     
     if (memoryByType['received-communication']) {
-      result += `\nIMPORTANT PAST COMMUNICATIONS:\n`;
+      result += `
+IMPORTANT PAST COMMUNICATIONS:
+`;
       memoryByType['received-communication'].forEach(memory => {
-        result += `- Turn ${memory.turnCreated}, from ${memory.from}: ${memory.content}\n`;
+        result += `- Turn ${memory.turnCreated}, from ${memory.from}: ${memory.content}
+`;
       });
     }
     
     if (memoryByType['decision']) {
-      result += `\nPAST DECISIONS:\n`;
+      result += `
+PAST DECISIONS:
+`;
       memoryByType['decision'].forEach(memory => {
-        result += `- Turn ${memory.turnCreated}:\n`;
-        result += `  Actions: ${memory.actions.join(', ')}\n`;
+        result += `- Turn ${memory.turnCreated}:
+`;
+        result += `  Actions: ${memory.actions.join(', ')}
+`;
         if (memory.communications && memory.communications.length > 0) {
-          result += `  Communications: ${memory.communications.map(c => `To ${c.to}: ${c.message}`).join(', ')}\n`;
+          result += `  Communications: ${memory.communications.map(c => `To ${c.to}: ${c.message}`).join(', ')}
+`;
         }
       });
     }
@@ -1336,9 +1399,9 @@ class MemoryStore {
 // Export the classes
 if (typeof window !== 'undefined') {
   // Browser environment
-  window.MachinaPrincipis.AIAgentManager = AIAgentManager;
-  window.MachinaPrincipis.MemoryStore = MemoryStore;
-  console.log("AI agent manager classes exported to window.MachinaPrincipis");
+  window.AIAgentManager = AIAgentManager;
+  window.MemoryStore = MemoryStore;
+  console.log("AI agent manager classes exported to window object");
 }
 
 if (typeof module !== 'undefined') {
