@@ -6,7 +6,8 @@ Machiavellian AI Civilization Framework for vibetesting
 
 The Machiavellian AI Civilization Framework is a research platform designed to observe and analyze strategic behavior, deception, alliance formation, and betrayal among AI agents in a controlled environment. Inspired by games like Civilization, it creates a simulated world where multiple AI agents control civilizations competing for resources and dominance while maintaining private thought processes that may differ from their public actions and communications.
 
-![Screenshot of the Machiavellian AI Civilization Framework](screenshot.png)
+
+I was unable to achieve to integrate the ambitious aim of this project. But it was an instructive lesson. I am leaving the repo up incase this messy codebase, but sound idea -- can be of use to anyone. 
 
 ## Overview
 
