@@ -1,6 +1,5 @@
 # Machina-Principis
-Machiavellian AI Civilization Framework for vibetesting
-
+Machiavellian AI Civilization Framework for vibetesting -- the scope of this project has been hard to implement. This has been an instructive exercise for me. 
 
 # Machiavellian AI Civilization Framework
 
